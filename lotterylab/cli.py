@@ -106,9 +106,53 @@ def cmd_backtest(args):
     print(res)
 
 
+def _spread(n, lo, hi):
+    """n distinct numbers evenly spread across [lo, hi]."""
+    if n >= hi - lo + 1:
+        return list(range(lo, hi + 1))
+    out = []
+    for i in range(n):
+        v = round(lo + (hi - lo) * i / (n - 1))
+        while v in out:  # nudge off a rounding collision
+            v += 1
+        out.append(min(v, hi))
+    return sorted(set(out))
+
+
+def _special_for(i, spec):
+    """A deterministic, valid set of special balls for display ticket i."""
+    picks, v = [], i
+    while len(picks) < spec.special_count:
+        cand = (v % spec.special_max) + 1
+        if cand not in picks:
+            picks.append(cand)
+        v += 1
+    return tuple(sorted(picks))
+
+
 def cmd_wheel(args):
     spec = games.get(args.game)
-    chosen = args.numbers or list(range(1, args.n + 1))
+    if args.numbers:
+        chosen = sorted(set(args.numbers))
+        bad = [x for x in chosen if not (1 <= x <= spec.main_max)]
+        if bad:
+            print(
+                f"Out of range for {spec.name} (main pool is 1-{spec.main_max}): {bad}",
+                file=sys.stderr,
+            )
+            return
+        if len(chosen) < spec.main_count:
+            print(
+                f"Need at least {spec.main_count} numbers to wheel {spec.name}; "
+                f"got {len(chosen)}.",
+                file=sys.stderr,
+            )
+            return
+        source = "your numbers"
+    else:
+        chosen = _spread(args.n, 1, spec.main_max)
+        source = f"an even spread across 1-{spec.main_max} (pass your own with --numbers)"
+
     if len(chosen) > 14:
         print(
             "Heads up: covering designs grow fast; >14 numbers can be slow. "
@@ -116,16 +160,34 @@ def cmd_wheel(args):
             file=sys.stderr,
         )
         chosen = chosen[:14]
+
     report = wheel_report(spec, chosen)
     print(report)
-    print(f"\n  tickets ({report.n_tickets}):")
-    for tk in report.tickets:
-        print(f"    {tk}")
-    print(
-        "\n  Honest note: this guarantees a 3-match ONLY when >=3 of your chosen "
-        "numbers are drawn, and the ticket cost exceeds a 3-match prize. It buys "
-        "determinism, not profit."
-    )
+    print(f"\n  wheeling {source}: {report.chosen}")
+    if spec.special_count:
+        print(
+            f"  tickets ({report.n_tickets}) — each also needs "
+            f"{spec.special_count} {spec.special_name}(s) from 1-{spec.special_max}; "
+            f"cycled below so the block spreads that pick too:"
+        )
+        for i, tk in enumerate(report.tickets):
+            print(f"    {tk}  +  {spec.special_name}: {_special_for(i, spec)}")
+        print(
+            f"\n  Honest note: the 3-match guarantee covers the {spec.main_count} main "
+            f"numbers only — the {spec.special_name} (1-{spec.special_max}) is an "
+            f"independent pick the wheel can't help with. And it holds only when >=3 "
+            f"of your chosen numbers are drawn; the ticket cost exceeds a 3-match "
+            f"prize, so it buys determinism, not profit."
+        )
+    else:
+        print(f"  tickets ({report.n_tickets}):")
+        for tk in report.tickets:
+            print(f"    {tk}")
+        print(
+            "\n  Honest note: this guarantees a 3-match ONLY when >=3 of your chosen "
+            "numbers are drawn, and the ticket cost exceeds a 3-match prize. It buys "
+            "determinism, not profit."
+        )
 
 
 def cmd_ev(args):
@@ -187,8 +249,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("wheel")
     sp.add_argument("game", choices=list(games.GAMES))
-    sp.add_argument("-n", type=int, default=9, help="how many numbers to wheel")
-    sp.add_argument("--numbers", type=int, nargs="+", help="explicit numbers to wheel")
+    sp.add_argument("-n", type=int, default=9,
+                    help="how many numbers to wheel (default 9, spread across the pool)")
+    sp.add_argument("--numbers", type=int, nargs="+",
+                    help="explicit numbers to wheel, e.g. --numbers 4 11 19 27 35 38")
     sp.set_defaults(func=cmd_wheel)
 
     sp = sub.add_parser("ev")
