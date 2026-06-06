@@ -25,8 +25,8 @@ lack of tuning — see [Why the old approach couldn't work](#why-the-old-approac
 | **EuroDreams (EU)** | 6/40 + 1/5 | **1 in 32** | 1 in 19,191,900 |
 
 **EuroDreams is the realistic target.** Its match-3 is an order of magnitude
-friendlier than Powerball's, and it draws daily — a single ticket is expected to
-match 3 about once a month.
+friendlier than Powerball's — a single ticket is expected to match 3 about every 32
+draws (median wait ~3 months at two draws a week).
 
 ## Quick start
 
@@ -118,12 +118,37 @@ are never overwritten (the old scripts clobbered them in place). The loader appl
 a project-wide **2018-to-present floor** (`store.MIN_DATE`) combined with each game's
 matrix-change date — whichever is later — so odds and backtests are always computed
 against one consistent set of rules (e.g. Powerball's pre-2018 draws and any
-old-matrix Mega Millions rows are dropped automatically). To refresh:
+old-matrix Mega Millions rows are dropped automatically). It tries snapshots
+newest-first and skips any that fail to parse, so one bad download never breaks the
+pipeline.
+
+To refresh (writes a NEW snapshot, never clobbers; rejects a download that doesn't
+parse to any draws):
 
 ```python
-from lotterylab.store import fetch_raw   # writes a NEW snapshot, never clobbers
-fetch_raw("powerball")
+from lotterylab.store import fetch_raw
+fetch_raw("powerball")      # data.ny.gov
+fetch_raw("megamillions")  # data.ny.gov
+fetch_raw("euromillions")  # FDJ — merges multiple era-files into one snapshot
+fetch_raw("eurodreams")    # FDJ — single live file
 ```
+
+**Current data sources** — all four auto-fetch and run through June 2026:
+
+| Game | Source | Auto-fetch | Latest |
+|---|---|---|---|
+| Powerball | NY Open Data (`data.ny.gov`) | ✅ `fetch_raw` | through 2026-06 (1,125 draws) |
+| Mega Millions | NY Open Data (`data.ny.gov`) | ✅ `fetch_raw` | through 2026-06 (844 draws) |
+| EuroMillions | FDJ official history (`media.fdj.fr` + draw-info API) | ✅ `fetch_raw` | through 2026-06 (880 draws) |
+| EuroDreams | FDJ official history (draw-info API) | ✅ `fetch_raw` | through 2026-06 (270 draws) |
+
+The two European games come from **FDJ** (the French operator). FDJ publishes history
+in semicolon-delimited, era-split files (the EuroMillions star pool changed over the
+years, so it's chunked; EuroDreams is one file). `fetch_raw` downloads the relevant
+files — stable `media.fdj.fr` archives for closed eras plus FDJ's live draw-info API
+for the current era — parses the French format, de-dupes by draw date, and writes one
+combined snapshot in the adapter's layout. (The UK national-lottery CSV endpoint was
+retired — it now serves only the latest draw as XML.)
 
 ---
 
