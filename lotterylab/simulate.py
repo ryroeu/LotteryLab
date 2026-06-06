@@ -40,7 +40,7 @@ DRAWS_PER_WEEK = {
     "powerball": 3,
     "megamillions": 2,
     "euromillions": 2,
-    "eurodreams": 7,  # daily
+    "eurodreams": 2,  # Monday & Thursday
 }
 
 
