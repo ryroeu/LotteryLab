@@ -25,6 +25,35 @@ from .combinatorics import hypergeom_pmf
 from .games import GameSpec
 
 
+def spread_numbers(n: int, lo: int, hi: int) -> list[int]:
+    """n distinct numbers evenly spread across [lo, hi] — a neutral default pool."""
+    if n >= hi - lo + 1:
+        return list(range(lo, hi + 1))
+    out: list[int] = []
+    for i in range(n):
+        v = round(lo + (hi - lo) * i / (n - 1))
+        while v in out:  # nudge off a rounding collision
+            v += 1
+        out.append(min(v, hi))
+    return sorted(set(out))
+
+
+def cycled_specials(i: int, spec: GameSpec) -> tuple[int, ...]:
+    """A deterministic, valid set of special balls for display ticket ``i``.
+
+    The wheel only covers main numbers; cycling the special pick across the block
+    at least spreads that independent choice too.
+    """
+    picks: list[int] = []
+    v = i
+    while len(picks) < spec.special_count:
+        cand = (v % spec.special_max) + 1
+        if cand not in picks:
+            picks.append(cand)
+        v += 1
+    return tuple(sorted(picks))
+
+
 def covering_design(numbers: list[int], k: int, t: int = 3) -> list[tuple[int, ...]]:
     """Greedy (v, k, t) cover: pick k-subsets until every t-subset of ``numbers``
     is covered. Greedy is not minimal (minimal covers are NP-hard; see the La Jolla

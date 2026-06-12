@@ -31,13 +31,33 @@ draws (median wait ~3 months at two draws a week).
 ## Quick start
 
 ```bash
-pip install -r requirements.txt        # pandas, numpy, scipy, requests, pytest
+pip install -r requirements.txt        # pandas, numpy, scipy, requests, streamlit, pytest
+streamlit run app/main.py              # ← the web UI (everything below, pointable & clickable)
 python -m lotterylab odds              # the table above
 python -m lotterylab prove eurodreams  # run every strategy vs the chance line
 python -m lotterylab wheel eurodreams -n 8   # a covering design that guarantees 3-matches
 python -m lotterylab wait              # how long until a ticket matches 3?
-pytest                                 # 16 tests, incl. the exact odds
+pytest                                 # tests, incl. the exact odds + UI smoke tests
 ```
+
+## The web UI
+
+`streamlit run app/main.py` serves a clean dark-gold dashboard over the same
+library the CLI uses — same numbers, same honest framing, organised the way the
+project thinks:
+
+| Section | Page | What you can do |
+|---|---|---|
+| Understand | **The Odds** | the exact odds per game, the premise, data status |
+| Understand | **Frequency** | draw-frequency chart + live chi-square uniformity test |
+| Prove | **Strategies vs Chance** | run every strategy walk-forward; see them hug the baseline (±2 SE band), per-strategy tier breakdown; synthetic-data toggle |
+| Engineer | **Wheeling** | build a covering design from a spread or your own numbers; guarantee, cost, and the full ticket block |
+| Engineer | **Expected Value** | build a ticket and compare its jackpot-share EV against all-birthday / all-high references |
+| Feel It | **Time & Variance** | per-game wait until a 3-match; Monte-Carlo season simulator with net-result histogram |
+| Admin | **Data** | snapshots on disk + one-click fetch of fresh official history |
+
+Everything is cached, so the heavy bits (backtests, covering designs, simulations)
+run once and then respond instantly.
 
 ## What's in the box
 
@@ -107,8 +127,12 @@ lotterylab/
   simulate.py       variance simulator + time-to-3-match
   synth.py          provably-fair synthetic draws (offline tests / demos)
   cli.py            python -m lotterylab <command>
+app/
+  main.py           streamlit run app/main.py — the web UI entry point
+  shared.py         cached data access + formatting shared by every page
+  views/            one file per page (overview, prove, wheel, ev, …)
 data/raw/<game>/    immutable source snapshots (never overwritten)
-tests/              16 tests, including the exact published odds
+tests/              library tests (incl. the exact published odds) + UI smoke tests
 ```
 
 ## Data

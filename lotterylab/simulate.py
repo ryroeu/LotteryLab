@@ -86,13 +86,14 @@ class VarianceReport:
         )
 
 
-def simulate_variance(
+def variance_samples(
     spec: GameSpec, *, draws: int = 104, n_seasons: int = 2000, seed: int = 0
-) -> VarianceReport:
+) -> tuple[np.ndarray, float]:
     """Monte-Carlo a uniform player over ``n_seasons`` independent seasons.
 
     Net per season = winnings - spend. Uses exact tier probabilities to draw
-    outcomes (no need to simulate ball-by-ball).
+    outcomes (no need to simulate ball-by-ball). Returns the per-season net
+    array plus the fraction of seasons containing at least one 3-match.
     """
     rng = np.random.default_rng(seed)
     from .baseline import all_tier_probabilities
@@ -121,6 +122,17 @@ def simulate_variance(
         if three_plus_idx[picks].any():
             any3 += 1
 
+    return nets, any3 / n_seasons
+
+
+def simulate_variance(
+    spec: GameSpec, *, draws: int = 104, n_seasons: int = 2000, seed: int = 0
+) -> VarianceReport:
+    """Summary statistics over ``variance_samples`` — see there for the model."""
+    nets, any3_fraction = variance_samples(
+        spec, draws=draws, n_seasons=n_seasons, seed=seed
+    )
+
     return VarianceReport(
         game=spec.name,
         strategy="random",
@@ -132,5 +144,5 @@ def simulate_variance(
         p95_net=float(np.percentile(nets, 95)),
         best_net=float(nets.max()),
         currency=spec.currency,
-        any_3plus_fraction=any3 / n_seasons,
+        any_3plus_fraction=any3_fraction,
     )
