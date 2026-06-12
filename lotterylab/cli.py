@@ -20,7 +20,7 @@ from . import analytics, ev, games, simulate
 from .backtest import backtest
 from .combinatorics import odds_table
 from .strategy import BUILTIN_STRATEGIES, get_strategy
-from .wheeling import wheel_report
+from .wheeling import cycled_specials, spread_numbers, wheel_report
 
 
 def _load(game: str, use_synth: bool, n: int = 1500):
@@ -106,30 +106,6 @@ def cmd_backtest(args):
     print(res)
 
 
-def _spread(n, lo, hi):
-    """n distinct numbers evenly spread across [lo, hi]."""
-    if n >= hi - lo + 1:
-        return list(range(lo, hi + 1))
-    out = []
-    for i in range(n):
-        v = round(lo + (hi - lo) * i / (n - 1))
-        while v in out:  # nudge off a rounding collision
-            v += 1
-        out.append(min(v, hi))
-    return sorted(set(out))
-
-
-def _special_for(i, spec):
-    """A deterministic, valid set of special balls for display ticket i."""
-    picks, v = [], i
-    while len(picks) < spec.special_count:
-        cand = (v % spec.special_max) + 1
-        if cand not in picks:
-            picks.append(cand)
-        v += 1
-    return tuple(sorted(picks))
-
-
 def cmd_wheel(args):
     spec = games.get(args.game)
     if args.numbers:
@@ -150,7 +126,7 @@ def cmd_wheel(args):
             return
         source = "your numbers"
     else:
-        chosen = _spread(args.n, 1, spec.main_max)
+        chosen = spread_numbers(args.n, 1, spec.main_max)
         source = f"an even spread across 1-{spec.main_max} (pass your own with --numbers)"
 
     if len(chosen) > 14:
@@ -171,7 +147,7 @@ def cmd_wheel(args):
             f"cycled below so the block spreads that pick too:"
         )
         for i, tk in enumerate(report.tickets):
-            print(f"    {tk}  +  {spec.special_name}: {_special_for(i, spec)}")
+            print(f"    {tk}  +  {spec.special_name}: {cycled_specials(i, spec)}")
         print(
             f"\n  Honest note: the 3-match guarantee covers the {spec.main_count} main "
             f"numbers only — the {spec.special_name} (1-{spec.special_max}) is an "
