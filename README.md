@@ -31,13 +31,12 @@ draws (median wait ~3 months at two draws a week).
 ## Quick start
 
 ```bash
-pip install -r requirements.txt        # pandas, numpy, scipy, requests, streamlit, pytest
+pip install -r requirements.txt        # pandas, numpy, scipy, requests, streamlit
 streamlit run app/main.py              # ← the web UI (everything below, pointable & clickable)
 python -m lotterylab odds              # the table above
 python -m lotterylab prove eurodreams  # run every strategy vs the chance line
 python -m lotterylab wheel eurodreams -n 8   # a covering design that guarantees 3-matches
 python -m lotterylab wait              # how long until a ticket matches 3?
-pytest                                 # tests, incl. the exact odds + UI smoke tests
 ```
 
 ## The web UI
@@ -132,7 +131,6 @@ app/
   shared.py         cached data access + formatting shared by every page
   views/            one file per page (overview, prove, wheel, ev, …)
 data/raw/<game>/    immutable source snapshots (never overwritten)
-tests/              library tests (incl. the exact published odds) + UI smoke tests
 ```
 
 ## Data

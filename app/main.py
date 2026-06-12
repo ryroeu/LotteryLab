@@ -7,7 +7,17 @@ two levers that are real (covering designs and jackpot-share EV).
 
 from __future__ import annotations
 
-import streamlit as st
+import sys
+from pathlib import Path
+
+# Streamlit puts only this script's directory (app/) on sys.path. Add the repo
+# root so `from app import shared` and `import lotterylab` resolve in every
+# view this entry point runs — without requiring a pip install.
+_ROOT = str(Path(__file__).resolve().parent.parent)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+import streamlit as st  # noqa: E402
 
 st.set_page_config(
     page_title="Lottery Lab",

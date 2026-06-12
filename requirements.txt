@@ -6,6 +6,3 @@ requests>=2.28
 
 # Web UI (streamlit run app/main.py)
 streamlit>=1.49
-
-# Dev / test
-pytest>=7.0
