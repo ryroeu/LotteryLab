@@ -32,9 +32,7 @@ def popularity_multiplier(main: tuple[int, ...], spec: GameSpec) -> float:
     """Relative likelihood a random player picks this exact main combination,
     normalised so a uniform pick == 1.0. < 1 means less popular (shares less).
     """
-    mean_w = (
-        sum(number_weight(n) for n in range(1, spec.main_max + 1)) / spec.main_max
-    )
+    mean_w = sum(number_weight(n) for n in range(1, spec.main_max + 1)) / spec.main_max
     prod = 1.0
     for n in main:
         prod *= number_weight(n)
@@ -55,7 +53,7 @@ class EVReport:
     game: str
     main: tuple[int, ...]
     popularity_multiplier: float
-    expected_jackpot_share: float   # fraction of jackpot you'd keep if you win it
+    expected_jackpot_share: float  # fraction of jackpot you'd keep if you win it
     ev_per_ticket: float
     ev_per_dollar: float
     currency: str

@@ -21,8 +21,12 @@ from .schema import main_columns, special_columns
 from .validate import Ticket
 
 
-def _rand_pool(rng: np.random.Generator, lo: int, hi: int, count: int) -> tuple[int, ...]:
-    return tuple(int(x) for x in rng.choice(np.arange(lo, hi + 1), count, replace=False))
+def _rand_pool(
+    rng: np.random.Generator, lo: int, hi: int, count: int
+) -> tuple[int, ...]:
+    return tuple(
+        int(x) for x in rng.choice(np.arange(lo, hi + 1), count, replace=False)
+    )
 
 
 def _frequencies(history: pd.DataFrame, cols: list[str], pool_max: int) -> np.ndarray:
@@ -49,9 +53,7 @@ class Strategy:
         """Return valid tickets using only the supplied historical draws."""
         raise NotImplementedError
 
-    def special_pick(
-        self, spec: GameSpec, rng: np.random.Generator
-    ) -> tuple[int, ...]:
+    def special_pick(self, spec: GameSpec, rng: np.random.Generator) -> tuple[int, ...]:
         """Return a valid special-ball pick for ``spec``."""
         if not spec.special_count:
             return ()

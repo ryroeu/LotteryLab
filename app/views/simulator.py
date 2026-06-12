@@ -85,13 +85,17 @@ spend = draws * spec.price
 
 m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Season spend", shared.fmt_money(spend, spec.currency, 0), border=True)
-m2.metric("Mean net", shared.fmt_money(float(nets.mean()), spec.currency, 0), border=True)
+m2.metric(
+    "Mean net", shared.fmt_money(float(nets.mean()), spec.currency, 0), border=True
+)
 m3.metric(
     "Median net",
     shared.fmt_money(float(np.percentile(nets, 50)), spec.currency, 0),
     border=True,
 )
-m4.metric("Best season", shared.fmt_money(float(nets.max()), spec.currency, 0), border=True)
+m4.metric(
+    "Best season", shared.fmt_money(float(nets.max()), spec.currency, 0), border=True
+)
 m5.metric(
     "Seasons with a 3-match",
     f"{any3_fraction:.1%}",

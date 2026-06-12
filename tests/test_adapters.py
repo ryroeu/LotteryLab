@@ -14,7 +14,7 @@ def test_powerball_loads_modern_matrix_only():
     assert len(df) > 800  # ~999 draws from 2018-01-01 onward
     # every retained draw must be valid under the current 5/69 + 1/26 matrix
     for _, row in df.iterrows():
-        main = tuple(int(row[f"m{i+1}"]) for i in range(spec.main_count))
+        main = tuple(int(row[f"m{i + 1}"]) for i in range(spec.main_count))
         special = (int(row["s1"]),)
         validate_ticket(main, special, spec)
     # 2018 floor takes effect (later than the 2015 matrix change)
@@ -36,7 +36,7 @@ def test_megamillions_loads_valid_current_matrix():
     assert len(df) > 500  # ~844 draws from 2018-01-01 onward
     # every retained draw valid under the current 5/70 + 1/24 matrix
     for _, row in df.iterrows():
-        main = tuple(int(row[f"m{i+1}"]) for i in range(spec.main_count))
+        main = tuple(int(row[f"m{i + 1}"]) for i in range(spec.main_count))
         validate_ticket(main, (int(row["s1"]),), spec)
 
 
@@ -48,7 +48,7 @@ def test_euromillions_golden_row():
     row = df[df["date"] == dt.date(2025, 8, 15)]
     assert len(row) == 1
     row = row.iloc[0]
-    assert [row[f"m{i+1}"] for i in range(5)] == [13, 30, 35, 36, 40]
+    assert [row[f"m{i + 1}"] for i in range(5)] == [13, 30, 35, 36, 40]
     assert sorted([row["s1"], row["s2"]]) == [2, 6]
     assert len(df) > 500  # full FDJ history, not the old 52-row snapshot
     assert df["date"].min() >= MIN_DATE
@@ -62,6 +62,6 @@ def test_eurodreams_golden_row():
     row = df[df["date"] == dt.date(2024, 9, 26)]
     assert len(row) == 1
     row = row.iloc[0]
-    assert [row[f"m{i+1}"] for i in range(6)] == [9, 19, 21, 31, 32, 39]
+    assert [row[f"m{i + 1}"] for i in range(6)] == [9, 19, 21, 31, 32, 39]
     assert row["s1"] == 2
     assert len(df) > 200  # full FDJ history, not the old 94-row snapshot

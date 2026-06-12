@@ -23,7 +23,9 @@ def synth_history(spec: GameSpec, n_draws: int, seed: int = 0) -> pd.DataFrame:
     start = _dt.date(2018, 1, 1)
     draws = []
     for i in range(n_draws):
-        main = rng.choice(np.arange(1, spec.main_max + 1), spec.main_count, replace=False)
+        main = rng.choice(
+            np.arange(1, spec.main_max + 1), spec.main_count, replace=False
+        )
         if spec.special_count:
             special = rng.choice(
                 np.arange(1, spec.special_max + 1), spec.special_count, replace=False

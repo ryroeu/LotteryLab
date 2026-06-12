@@ -23,16 +23,21 @@ with left:
 spec = games.get(game)
 
 with right:
-    mode = st.segmented_control(
-        "Numbers to wheel",
-        ["Even spread", "Pick my own"],
-        default="Even spread",
-    ) or "Even spread"
+    mode = (
+        st.segmented_control(
+            "Numbers to wheel",
+            ["Even spread", "Pick my own"],
+            default="Even spread",
+        )
+        or "Even spread"
+    )
 
 if mode == "Even spread":
     n = st.slider("How many numbers (K)", spec.main_count, MAX_WHEEL, 9)
     chosen = spread_numbers(n, 1, spec.main_max)
-    st.caption(f"An even spread across 1–{spec.main_max}: **{', '.join(map(str, chosen))}**")
+    st.caption(
+        f"An even spread across 1–{spec.main_max}: **{', '.join(map(str, chosen))}**"
+    )
 else:
     chosen = sorted(
         st.multiselect(
@@ -46,7 +51,9 @@ else:
         )
     )
     if len(chosen) < spec.main_count:
-        st.info(f"Pick at least {spec.main_count} numbers to build a wheel for {spec.name}.")
+        st.info(
+            f"Pick at least {spec.main_count} numbers to build a wheel for {spec.name}."
+        )
         st.stop()
 
 
@@ -61,7 +68,9 @@ report = build_wheel(game, tuple(chosen))
 three_match_pay = spec.prize_table.get((3, 0), 0.0)
 
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Tickets", report.n_tickets, help=f"k = {report.k} numbers per ticket", border=True)
+m1.metric(
+    "Tickets", report.n_tickets, help=f"k = {report.k} numbers per ticket", border=True
+)
 m2.metric(
     "Cost per draw",
     shared.fmt_money(report.cost, report.currency),
@@ -79,7 +88,9 @@ m3.metric(
     ),
     border=True,
 )
-m4.metric("≈ draws between hits", f"{report.expected_draws_between_hits:.1f}", border=True)
+m4.metric(
+    "≈ draws between hits", f"{report.expected_draws_between_hits:.1f}", border=True
+)
 
 st.success(f"**Guarantee:** {report.guarantee}.", icon="🔒")
 st.warning(

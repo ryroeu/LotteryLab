@@ -32,7 +32,11 @@ def validate_ticket(main, special, spec: GameSpec) -> None:
     """Raise ``InvalidTicket`` if the ticket is not playable for ``spec``."""
     check_pool(main, spec.main_count, 1, spec.main_max, f"{spec.key} main")
     check_pool(
-        special, spec.special_count, 1, spec.special_max, f"{spec.key} {spec.special_name}"
+        special,
+        spec.special_count,
+        1,
+        spec.special_max,
+        f"{spec.key} {spec.special_name}",
     )
 
 

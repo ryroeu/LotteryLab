@@ -112,7 +112,9 @@ def variance_samples(
     # payout per tier (jackpot uses nominal estimate; non-winning tiers -> 0)
     payouts = np.array(
         [
-            spec.jackpot_estimate if k == spec.jackpot_tier else spec.prize_table.get(k, 0.0)
+            spec.jackpot_estimate
+            if k == spec.jackpot_tier
+            else spec.prize_table.get(k, 0.0)
             for k in tier_keys
         ]
     )

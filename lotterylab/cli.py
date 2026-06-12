@@ -130,7 +130,9 @@ def cmd_wheel(args):
         source = "your numbers"
     else:
         chosen = spread_numbers(args.n, 1, spec.main_max)
-        source = f"an even spread across 1-{spec.main_max} (pass your own with --numbers)"
+        source = (
+            f"an even spread across 1-{spec.main_max} (pass your own with --numbers)"
+        )
 
     if len(chosen) > 14:
         print(
