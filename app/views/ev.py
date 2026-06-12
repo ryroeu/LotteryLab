@@ -2,20 +2,13 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import altair as alt
+import pandas as pd
+import streamlit as st
 
-_APP = str(Path(__file__).resolve().parents[1])
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
-
-import altair as alt  # noqa: E402
-import pandas as pd  # noqa: E402
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402
-from lotterylab import games  # noqa: E402
-from lotterylab.ev import BIRTHDAY_WEIGHT, ticket_ev  # noqa: E402
+from app import shared
+from lotterylab import games
+from lotterylab.ev import BIRTHDAY_WEIGHT, ticket_ev
 
 st.title("💰 Expected Value")
 st.caption(
@@ -95,7 +88,10 @@ for col, (label, rep) in zip(cols, reports.items()):
         st.metric(
             "EV per ticket",
             shared.fmt_money(rep.ev_per_ticket, rep.currency, 4),
-            delta=f"{rep.ev_per_ticket - spec.price:+,.2f} vs the {shared.fmt_money(spec.price, spec.currency)} price",
+            delta=(
+                f"{rep.ev_per_ticket - spec.price:+,.2f} vs the "
+                f"{shared.fmt_money(spec.price, spec.currency)} price"
+            ),
             delta_color="normal",
         )
 

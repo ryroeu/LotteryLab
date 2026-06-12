@@ -8,11 +8,16 @@ adapter, filters to the current matrix era, validates, and returns a tidy frame.
 
 from __future__ import annotations
 
+import csv as _csv
 import datetime as _dt
 import glob
+import hashlib
+import io
 import os
+import zipfile
 
 import pandas as pd
+import requests
 
 from . import adapters
 from .games import get
@@ -30,6 +35,15 @@ CACHE_DIR = os.path.join(ROOT, "data", "cache")
 MIN_DATE = _dt.date(2018, 1, 1)
 
 _UA = {"User-Agent": "Mozilla/5.0 (compatible; lotterylab/0.1)"}
+SNAPSHOT_PARSE_ERRORS = (
+    KeyError,
+    OSError,
+    TypeError,
+    UnicodeDecodeError,
+    ValueError,
+    pd.errors.EmptyDataError,
+    pd.errors.ParserError,
+)
 
 # Single-CSV download URLs. fetch_raw writes a new timestamped snapshot and never
 # touches existing ones. (EuroMillions is multi-source — see EUROMILLIONS_FDJ_SOURCES.)
@@ -46,13 +60,15 @@ FETCH_URLS = {
 EUROMILLIONS_FDJ_SOURCES = [
     "https://media.fdj.fr/static/csv/euromillions/euromillions_201609.zip",
     "https://media.fdj.fr/static/csv/euromillions/euromillions_201902.zip",
-    "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afe6",
+    "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/"
+    "documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afe6",
 ]
 
 # EuroDreams launched 2023-11 with one stable matrix, so FDJ serves it as a single
 # live file via the draw-info API (boule_1..6 + numero_dream).
 EURODREAMS_FDJ_SOURCES = [
-    "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afa5",
+    "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/"
+    "documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afa5",
 ]
 
 
@@ -62,6 +78,7 @@ def all_snapshots(game: str) -> list[str]:
 
 
 def newest_snapshot(game: str) -> str | None:
+    """Newest raw snapshot path for a game, if one exists."""
     snaps = all_snapshots(game)
     return snaps[0] if snaps else None
 
@@ -70,7 +87,7 @@ def _count_parsable_draws(game: str, path: str) -> int:
     """How many draws this snapshot yields through the adapter (0 if unparsable)."""
     try:
         return len(adapters.parse(game, pd.read_csv(path)))
-    except Exception:
+    except SNAPSHOT_PARSE_ERRORS:
         return 0
 
 
@@ -84,13 +101,10 @@ def _parse_fdj(content: bytes, n_main: int, special_cols: list[str]) -> list[dic
     column as the index and silently shift every column left. Returns [] if the
     expected columns are absent.
     """
-    import io
-    import zipfile
-
     raw = content
     if content[:2] == b"PK":  # zip magic
-        z = zipfile.ZipFile(io.BytesIO(content))
-        raw = z.read(z.namelist()[0])
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            raw = archive.read(archive.namelist()[0])
     df = pd.read_csv(io.BytesIO(raw), sep=";", encoding="latin-1", index_col=False)
     main_cols = [f"boule_{i}" for i in range(1, n_main + 1)]
     need = ["date_de_tirage"] + main_cols + special_cols
@@ -117,8 +131,6 @@ def _parse_fdj(content: bytes, n_main: int, special_cols: list[str]) -> list[dic
 
 def _download_fdj(sources: list[str], n_main: int, special_cols: list[str]) -> dict:
     """Download FDJ sources and merge their draws, de-duped by draw date."""
-    import requests
-
     by_date: dict[_dt.date, dict] = {}
     for url in sources:
         resp = requests.get(url, headers=_UA, timeout=60)
@@ -130,8 +142,6 @@ def _download_fdj(sources: list[str], n_main: int, special_cols: list[str]) -> d
 
 def _write_fdj_snapshot(game: str, today: _dt.date, header: list[str], by_date: dict) -> str:
     """Write merged FDJ draws to one combined snapshot in the game's adapter layout."""
-    import csv as _csv
-
     if not by_date:
         raise ValueError(
             f"FDJ {game} fetch produced no draws — the FDJ sources may have changed."
@@ -139,7 +149,7 @@ def _write_fdj_snapshot(game: str, today: _dt.date, header: list[str], by_date: 
     rows = sorted(by_date.values(), key=lambda r: r["date"])
     os.makedirs(os.path.join(RAW_DIR, game), exist_ok=True)
     path = os.path.join(RAW_DIR, game, f"{today.isoformat()}__fdj-combined.csv")
-    with open(path, "w", newline="") as f:
+    with open(path, "w", newline="", encoding="utf-8") as f:
         w = _csv.writer(f)
         w.writerow(header)
         for r in rows:
@@ -156,8 +166,17 @@ def fetch_euromillions(*, today: _dt.date | None = None) -> str:
     """
     today = today or _dt.date.today()
     by_date = _download_fdj(EUROMILLIONS_FDJ_SOURCES, 5, ["etoile_1", "etoile_2"])
-    header = ["DrawDate", "Ball 1", "Ball 2", "Ball 3", "Ball 4", "Ball 5",
-              "Lucky Star 1", "Lucky Star 2", "DrawNumber"]
+    header = [
+        "DrawDate",
+        "Ball 1",
+        "Ball 2",
+        "Ball 3",
+        "Ball 4",
+        "Ball 5",
+        "Lucky Star 1",
+        "Lucky Star 2",
+        "DrawNumber",
+    ]
     return _write_fdj_snapshot("euromillions", today, header, by_date)
 
 
@@ -167,8 +186,17 @@ def fetch_eurodreams(*, today: _dt.date | None = None) -> str:
     by_date = _download_fdj(EURODREAMS_FDJ_SOURCES, 6, ["numero_dream"])
     # trailing "DrawNumber" matches the writer's draw_id column; the adapter reads
     # by name and ignores it.
-    header = ["Date", "Number 1", "Number 2", "Number 3", "Number 4", "Number 5",
-              "Number 6", "Dream Number", "DrawNumber"]
+    header = [
+        "Date",
+        "Number 1",
+        "Number 2",
+        "Number 3",
+        "Number 4",
+        "Number 5",
+        "Number 6",
+        "Dream Number",
+        "DrawNumber",
+    ]
     return _write_fdj_snapshot("eurodreams", today, header, by_date)
 
 
@@ -181,10 +209,6 @@ def fetch_raw(game: str, *, today: _dt.date | None = None, validate: bool = True
     snapshot behind (as the old EuroMillions CSV endpoint did when it switched to
     an XML latest-draw-only feed).
     """
-    import hashlib
-
-    import requests
-
     today = today or _dt.date.today()
     newly_written = True
     if game == "euromillions":
@@ -245,7 +269,7 @@ def load_canonical(
     for idx, path in enumerate(snapshots):
         try:
             draws = adapters.parse(game, pd.read_csv(path))
-        except Exception:
+        except SNAPSHOT_PARSE_ERRORS:
             draws = []
 
         kept: list[Draw] = []
@@ -280,6 +304,7 @@ def load_canonical(
 
 
 def write_cache(game: str, df: pd.DataFrame) -> str:
+    """Write a derived canonical cache CSV and return its path."""
     os.makedirs(CACHE_DIR, exist_ok=True)
     path = os.path.join(CACHE_DIR, f"{game}.csv")
     df.to_csv(path, index=False)

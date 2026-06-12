@@ -19,6 +19,7 @@ DISCLAIMER = "NOTE: historical only — zero predictive power. A fair draw has n
 
 
 def frequency(history: pd.DataFrame, spec: GameSpec) -> np.ndarray:
+    """Count how often each main number appears in the draw history."""
     counts = np.zeros(spec.main_max + 1, dtype=int)
     vals = history[main_columns(spec)].to_numpy().ravel()
     for v in vals:
@@ -46,14 +47,15 @@ def uniformity_test(history: pd.DataFrame, spec: GameSpec) -> dict:
 
 
 def ascii_bars(history: pd.DataFrame, spec: GameSpec, width: int = 40) -> str:
+    """Render a terminal-friendly frequency chart plus uniformity test."""
     counts = frequency(history, spec)[1:]
     if counts.max() == 0:
         return "(no data)"
     lines = [DISCLAIMER, ""]
     expected = counts.sum() / spec.main_max
     for i, c in enumerate(counts, start=1):
-        bar = "#" * int(round(width * c / counts.max()))
-        lines.append(f"  {i:2d} | {bar:<{width}} {c}")
+        bar_text = "#" * int(round(width * c / counts.max()))
+        lines.append(f"  {i:2d} | {bar_text:<{width}} {c}")
     lines.append("")
     lines.append(f"  expected per number if uniform: {expected:.1f}")
     test = uniformity_test(history, spec)

@@ -2,20 +2,13 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import altair as alt
+import pandas as pd
+import streamlit as st
 
-_APP = str(Path(__file__).resolve().parents[1])
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
-
-import altair as alt  # noqa: E402
-import pandas as pd  # noqa: E402
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402
-from lotterylab import games  # noqa: E402
-from lotterylab.strategy import BUILTIN_STRATEGIES  # noqa: E402
+from app import shared
+from lotterylab import games
+from lotterylab.strategy import BUILTIN_STRATEGIES
 
 st.title("⚖️ Strategies vs Chance")
 st.caption(
@@ -33,16 +26,11 @@ with right:
 
 spec = games.get(game)
 
-try:
-    hist = shared.load_history(game, synth, synth_n)
-except Exception as e:
-    st.error(f"Could not load history for {spec.name}: {e}")
-    st.stop()
-
-shared.data_source_caption(game, synth, synth_n)
+hist = shared.require_history(game, synth, synth_n)
 
 
 def verdict_of(z: float) -> str:
+    """Translate a z-score into the UI's plain-language verdict."""
     # An "edge" would be ABOVE baseline. With this many strategies, |z|~2 is
     # expected by chance, so only a large positive surprise would matter.
     if z > 3:
@@ -83,7 +71,9 @@ table = pd.DataFrame(
 )
 
 band = (
-    alt.Chart(pd.DataFrame({"lo": [max(0.0, p3 - 2 * se_rate)], "hi": [p3 + 2 * se_rate]}))
+    alt.Chart(
+        pd.DataFrame({"lo": [max(0.0, p3 - 2 * se_rate)], "hi": [p3 + 2 * se_rate]})
+    )
     .mark_rect(opacity=0.15, color="#9AA4B2")
     .encode(x="lo:Q", x2="hi:Q")
 )
@@ -96,8 +86,12 @@ points = (
     alt.Chart(table)
     .mark_circle(size=180, color="#F2B636")
     .encode(
-        x=alt.X("rate:Q", title="≥3-main hit rate", scale=alt.Scale(zero=False),
-                axis=alt.Axis(format=".4f")),
+        x=alt.X(
+            "rate:Q",
+            title="≥3-main hit rate",
+            scale=alt.Scale(zero=False),
+            axis=alt.Axis(format=".4f"),
+        ),
         y=alt.Y("strategy:N", title=None, sort=table["strategy"].tolist()),
         tooltip=[
             alt.Tooltip("strategy:N"),
@@ -144,7 +138,12 @@ res = results[chosen]
 d1, d2, d3, d4 = st.columns(4)
 d1.metric("Spent", shared.fmt_money(res.spent, res.currency, 0), border=True)
 d2.metric("Won", shared.fmt_money(res.won, res.currency, 0), border=True)
-d3.metric("ROI", f"{res.roi:.3f}", help="winnings ÷ spend — fair games sit well below 1", border=True)
+d3.metric(
+    "ROI",
+    f"{res.roi:.3f}",
+    help="winnings ÷ spend — fair games sit well below 1",
+    border=True,
+)
 d4.metric("z vs baseline", f"{res.z_vs_baseline:+.2f}", border=True)
 
 tiers = [

@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import pandas as pd
+import streamlit as st
 
-_APP = str(Path(__file__).resolve().parents[1])
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
-
-import pandas as pd  # noqa: E402
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402
-from lotterylab import games  # noqa: E402
-from lotterylab.combinatorics import odds_table  # noqa: E402
+from app import shared
+from lotterylab import games
+from lotterylab.combinatorics import odds_table
 
 st.title("🎰 Lottery Lab")
 st.caption("An honest statistical sandbox for lottery numbers.")
@@ -37,7 +30,10 @@ for col, r in zip(cols, rows):
         st.metric(
             r["game"],
             f"1 in {r['match3_one_in']:,}",
-            help=f"Exact odds that one ticket matches 3 main numbers. Jackpot: 1 in {r['jackpot_one_in']:,}.",
+            help=(
+                "Exact odds that one ticket matches 3 main numbers. "
+                f"Jackpot: 1 in {r['jackpot_one_in']:,}."
+            ),
             border=True,
         )
 st.caption("Cards show **match-3 odds** — the realistic small win, exact to the draw matrix.")

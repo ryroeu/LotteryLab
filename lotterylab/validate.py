@@ -13,17 +13,18 @@ Ticket = tuple[tuple[int, ...], tuple[int, ...]]  # (main, special)
 
 
 class InvalidTicket(ValueError):
-    pass
+    """Raised when a ticket cannot be played under a game's matrix."""
 
 
 def check_pool(values, count: int, lo: int, hi: int, label: str) -> None:
+    """Validate one pool of main or special numbers."""
     vals = list(values)
     if len(vals) != count:
         raise InvalidTicket(f"{label}: expected {count} numbers, got {len(vals)}")
     if len(set(vals)) != count:
         raise InvalidTicket(f"{label}: duplicate numbers in {vals}")
     for v in vals:
-        if not (lo <= v <= hi):
+        if v < lo or v > hi:
             raise InvalidTicket(f"{label}: {v} out of range [{lo}, {hi}]")
 
 
@@ -36,6 +37,7 @@ def validate_ticket(main, special, spec: GameSpec) -> None:
 
 
 def is_valid_ticket(main, special, spec: GameSpec) -> bool:
+    """Return whether a ticket is playable for ``spec``."""
     try:
         validate_ticket(main, special, spec)
         return True

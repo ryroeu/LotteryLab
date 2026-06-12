@@ -35,6 +35,8 @@ def _frequencies(history: pd.DataFrame, cols: list[str], pool_max: int) -> np.nd
 
 
 class Strategy:
+    """Base contract for a no-lookahead lottery ticket generator."""
+
     name = "strategy"
 
     def generate(
@@ -44,23 +46,28 @@ class Strategy:
         n_tickets: int,
         rng: np.random.Generator,
     ) -> list[Ticket]:
+        """Return valid tickets using only the supplied historical draws."""
         raise NotImplementedError
 
-    # Convenience: always produce a valid special-ball pick (random unless overridden)
-    def _special(self, spec, rng) -> tuple[int, ...]:
+    def special_pick(
+        self, spec: GameSpec, rng: np.random.Generator
+    ) -> tuple[int, ...]:
+        """Return a valid special-ball pick for ``spec``."""
         if not spec.special_count:
             return ()
         return _rand_pool(rng, 1, spec.special_max, spec.special_count)
 
 
 class RandomPlayer(Strategy):
+    """Pick every ticket uniformly at random."""
+
     name = "random"
 
     def generate(self, history, spec, n_tickets, rng):
         out = []
         for _ in range(n_tickets):
             main = _rand_pool(rng, 1, spec.main_max, spec.main_count)
-            out.append((main, self._special(spec, rng)))
+            out.append((main, self.special_pick(spec, rng)))
         return out
 
 
@@ -75,7 +82,7 @@ class HotNumbers(Strategy):
             return RandomPlayer().generate(history, spec, n_tickets, rng)
         order = np.argsort(freq[1:])[::-1] + 1  # hottest first
         main = tuple(sorted(int(x) for x in order[: spec.main_count]))
-        return [(main, self._special(spec, rng)) for _ in range(n_tickets)]
+        return [(main, self.special_pick(spec, rng)) for _ in range(n_tickets)]
 
 
 class ColdNumbers(Strategy):
@@ -89,7 +96,7 @@ class ColdNumbers(Strategy):
             return RandomPlayer().generate(history, spec, n_tickets, rng)
         order = np.argsort(freq[1:]) + 1  # coldest first
         main = tuple(sorted(int(x) for x in order[: spec.main_count]))
-        return [(main, self._special(spec, rng)) for _ in range(n_tickets)]
+        return [(main, self.special_pick(spec, rng)) for _ in range(n_tickets)]
 
 
 class LastDrawEcho(Strategy):
@@ -160,7 +167,7 @@ class BiasedHigh(Strategy):
         out = []
         for _ in range(n_tickets):
             main = _rand_pool(rng, lo, spec.main_max, spec.main_count)
-            out.append((main, self._special(spec, rng)))
+            out.append((main, self.special_pick(spec, rng)))
         return out
 
 
@@ -179,6 +186,7 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
 
 
 def get_strategy(name: str) -> Strategy:
+    """Instantiate a built-in strategy by name."""
     try:
         return BUILTIN_STRATEGIES[name]()
     except KeyError:

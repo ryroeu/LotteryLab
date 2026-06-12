@@ -2,11 +2,13 @@
 
 from lotterylab import games
 from lotterylab.backtest import backtest
+from lotterylab.store import load_canonical
 from lotterylab.strategy import BUILTIN_STRATEGIES, get_strategy
 from lotterylab.synth import synth_history
 
 
 def test_random_strategy_matches_baseline_on_fair_data():
+    """Random play should match the exact baseline on synthetic fair data."""
     spec = games.get("eurodreams")  # highest match-3 rate -> tightest test
     hist = synth_history(spec, 4000, seed=7)
     res = backtest(get_strategy("random"), hist, spec, n_tickets=1, seed=2)
@@ -16,6 +18,7 @@ def test_random_strategy_matches_baseline_on_fair_data():
 
 
 def test_no_strategy_beats_chance_on_fair_data():
+    """No built-in strategy should meaningfully beat fair synthetic draws."""
     spec = games.get("eurodreams")
     hist = synth_history(spec, 4000, seed=11)
     for name in BUILTIN_STRATEGIES:
@@ -25,9 +28,8 @@ def test_no_strategy_beats_chance_on_fair_data():
 
 
 def test_backtest_runs_on_real_history():
+    """Real Powerball history should run through the backtest harness."""
     spec = games.get("powerball")
-    from lotterylab.store import load_canonical
-
     hist = load_canonical("powerball")
     res = backtest(get_strategy("random"), hist, spec, seed=1)
     assert res.n_draws > 800  # ~999 draws since 2018, minus warmup

@@ -16,6 +16,8 @@ from .games import GameSpec
 
 @dataclass(frozen=True)
 class Draw:
+    """One canonical lottery draw with sorted main and special balls."""
+
     game: str
     date: _dt.date
     draw_id: str | None
@@ -23,6 +25,7 @@ class Draw:
     special: tuple[int, ...]
 
     def __post_init__(self):
+        """Normalize ball ordering after dataclass initialization."""
         # Enforce sorted-ascending storage regardless of source order.
         object.__setattr__(self, "main", tuple(sorted(self.main)))
         object.__setattr__(self, "special", tuple(sorted(self.special)))
@@ -45,6 +48,7 @@ def draws_to_frame(draws: list[Draw], spec: GameSpec) -> pd.DataFrame:
 
 
 def frame_to_draws(df: pd.DataFrame, spec: GameSpec) -> list[Draw]:
+    """Convert a canonical DataFrame back into ``Draw`` objects."""
     main_cols = [f"m{j + 1}" for j in range(spec.main_count)]
     spec_cols = [f"s{j + 1}" for j in range(spec.special_count)]
     out = []
@@ -62,8 +66,10 @@ def frame_to_draws(df: pd.DataFrame, spec: GameSpec) -> list[Draw]:
 
 
 def main_columns(spec: GameSpec) -> list[str]:
+    """Canonical main-number column names for ``spec``."""
     return [f"m{j + 1}" for j in range(spec.main_count)]
 
 
 def special_columns(spec: GameSpec) -> list[str]:
+    """Canonical special-number column names for ``spec``."""
     return [f"s{j + 1}" for j in range(spec.special_count)]

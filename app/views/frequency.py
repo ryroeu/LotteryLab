@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import altair as alt
+import pandas as pd
+import streamlit as st
 
-_APP = str(Path(__file__).resolve().parents[1])
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
-
-import altair as alt  # noqa: E402
-import pandas as pd  # noqa: E402
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402
-from lotterylab import analytics, games  # noqa: E402
+from app import shared
+from lotterylab import analytics, games
 
 st.title("📊 Frequency")
 st.caption("How often each main number has been drawn — plus the test that shows it means nothing.")
@@ -29,13 +22,7 @@ with right:
 
 spec = games.get(game)
 
-try:
-    hist = shared.load_history(game, synth, synth_n)
-except Exception as e:
-    st.error(f"Could not load history for {spec.name}: {e}")
-    st.stop()
-
-shared.data_source_caption(game, synth, synth_n)
+hist = shared.require_history(game, synth, synth_n)
 
 counts = analytics.frequency(hist, spec)[1:]  # index 0 unused
 expected = counts.sum() / spec.main_max
@@ -47,8 +34,11 @@ bars = (
     alt.Chart(freq_df)
     .mark_bar(opacity=0.9)
     .encode(
-        x=alt.X("number:O", title="Main number",
-                axis=alt.Axis(labelAngle=0, values=axis_values)),
+        x=alt.X(
+            "number:O",
+            title="Main number",
+            axis=alt.Axis(labelAngle=0, values=axis_values),
+        ),
         y=alt.Y("count:Q", title="Times drawn"),
         tooltip=[
             alt.Tooltip("number:O", title="Number"),
@@ -80,7 +70,10 @@ m3.metric("Degrees of freedom", test["dof"], border=True)
 m4.metric("p-value", f"{test['p_value']:.3f}", border=True)
 
 if test["p_value"] > 0.05:
-    st.success(f"Verdict: **{test['verdict']}** — 'hot' and 'cold' numbers are sampling noise.", icon="✅")
+    st.success(
+        f"Verdict: **{test['verdict']}** — 'hot' and 'cold' numbers are sampling noise.",
+        icon="✅",
+    )
 else:
     st.error(f"Verdict: **{test['verdict']}**", icon="⚠️")
 

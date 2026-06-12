@@ -18,6 +18,7 @@ from .schema import Draw, draws_to_frame
 
 
 def synth_history(spec: GameSpec, n_draws: int, seed: int = 0) -> pd.DataFrame:
+    """Generate uniform synthetic draws for one game as a canonical frame."""
     rng = np.random.default_rng(seed)
     start = _dt.date(2018, 1, 1)
     draws = []

@@ -25,12 +25,15 @@ from .validate import validate_ticket
 
 
 def score_ticket(ticket, draw_main: set[int], draw_special: set[int]) -> tuple[int, int]:
+    """Count main and special matches for one ticket against one draw."""
     main, special = ticket
     return len(set(main) & draw_main), len(set(special) & draw_special)
 
 
 @dataclass
 class BacktestResult:
+    """Aggregate walk-forward backtest metrics for one strategy."""
+
     game: str
     strategy: str
     n_draws: int
@@ -46,6 +49,7 @@ class BacktestResult:
 
     @property
     def roi(self) -> float:
+        """Return winnings divided by spend."""
         return self.won / self.spent if self.spent else 0.0
 
     def __str__(self) -> str:
@@ -81,6 +85,7 @@ def backtest(
     warmup: int = 50,
     seed: int = 0,
 ) -> BacktestResult:
+    """Walk a strategy forward through history and score every generated ticket."""
     rng = np.random.default_rng(seed)
     draws = frame_to_draws(history, spec)
     n = len(draws)

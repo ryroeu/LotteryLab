@@ -7,6 +7,7 @@ from lotterylab.wheeling import covering_design, verify_guarantee, wheel_report
 
 
 def test_small_cover_guarantee_holds():
+    """A small greedy cover should cover every 3-subset."""
     numbers = list(range(1, 10))  # wheel 9 numbers
     k, t = 6, 3
     tickets = covering_design(numbers, k, t)
@@ -19,6 +20,7 @@ def test_small_cover_guarantee_holds():
 
 
 def test_wheel_report_eurodreams():
+    """EuroDreams wheel reports should verify their guarantee."""
     spec = games.get("eurodreams")  # k = 6
     report = wheel_report(spec, list(range(1, 9)))  # wheel 8 numbers
     assert report.n_tickets >= 1
@@ -28,6 +30,7 @@ def test_wheel_report_eurodreams():
 
 
 def test_full_pool_single_ticket_is_trivial():
+    """Choosing exactly k numbers should require one ticket."""
     # Wheeling exactly k numbers needs exactly one ticket.
     spec = games.get("powerball")  # k = 5
     report = wheel_report(spec, [3, 11, 19, 27, 35])

@@ -28,3 +28,9 @@ packages = ["lotterylab"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["."]
+
+[tool.pylint.design]
+max-args = 6
+max-attributes = 13
+max-locals = 26
