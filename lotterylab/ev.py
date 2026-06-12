@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .combinatorics import jackpot_odds, jackpot_probability, tier_probability
-from .games import GameSpec
+from .games import GameSpec, get
 
 # Heuristic over-pick multiplier for "birthday" numbers.
 BIRTHDAY_WEIGHT = 1.8
@@ -24,6 +24,7 @@ BASE_WEIGHT = 1.0
 
 
 def number_weight(n: int) -> float:
+    """Heuristic relative popularity weight for one main number."""
     return BIRTHDAY_WEIGHT if n <= 31 else BASE_WEIGHT
 
 
@@ -49,6 +50,8 @@ def _expected_inv_one_plus_binom(n: int, q: float) -> float:
 
 @dataclass
 class EVReport:
+    """Expected-value comparison for one ticket's main numbers."""
+
     game: str
     main: tuple[int, ...]
     popularity_multiplier: float
@@ -69,9 +72,8 @@ class EVReport:
             f"(< 1 always — you still lose, just less)"
         )
 
-    def _price(self):
-        from .games import get
-
+    def _price(self) -> float:
+        """Ticket price for this report's game."""
         return get(self.game).price
 
 
@@ -82,6 +84,7 @@ def ticket_ev(
     jackpot: float | None = None,
     n_players: int = 10_000_000,
 ) -> EVReport:
+    """Estimate one ticket's EV under the jackpot-sharing popularity model."""
     jackpot = spec.jackpot_estimate if jackpot is None else jackpot
     pop = popularity_multiplier(main, spec)
 

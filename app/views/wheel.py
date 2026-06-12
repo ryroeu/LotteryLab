@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import pandas as pd
+import streamlit as st
 
-_APP = str(Path(__file__).resolve().parents[1])
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
-
-import pandas as pd  # noqa: E402
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402
-from lotterylab import games  # noqa: E402
-from lotterylab.wheeling import cycled_specials, spread_numbers, wheel_report  # noqa: E402
+from app import shared
+from lotterylab import games
+from lotterylab.wheeling import cycled_specials, spread_numbers, wheel_report
 
 MAX_WHEEL = 14  # covering designs grow fast beyond this
 
@@ -43,7 +36,10 @@ if mode == "Even spread":
 else:
     chosen = sorted(
         st.multiselect(
-            f"Your numbers (1–{spec.main_max}, at least {spec.main_count}, at most {MAX_WHEEL})",
+            (
+                f"Your numbers (1–{spec.main_max}, at least {spec.main_count}, "
+                f"at most {MAX_WHEEL})"
+            ),
             options=list(range(1, spec.main_max + 1)),
             default=spread_numbers(9, 1, spec.main_max),
             max_selections=MAX_WHEEL,
@@ -56,6 +52,7 @@ else:
 
 @st.cache_data(show_spinner="Building the covering design…")
 def build_wheel(game_key: str, numbers: tuple[int, ...]):
+    """Build and cache a wheel report for a selected number pool."""
     return wheel_report(games.get(game_key), list(numbers))
 
 
@@ -76,7 +73,10 @@ m2.metric(
 m3.metric(
     "P(guarantee fires)",
     f"{report.p_condition:.1%}",
-    help=f"Probability that ≥{report.t} of your {len(report.chosen)} numbers are among the drawn balls.",
+    help=(
+        f"Probability that ≥{report.t} of your {len(report.chosen)} numbers "
+        "are among the drawn balls."
+    ),
     border=True,
 )
 m4.metric("≈ draws between hits", f"{report.expected_draws_between_hits:.1f}", border=True)

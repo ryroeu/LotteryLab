@@ -3,17 +3,12 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
-_APP = str(Path(__file__).resolve().parents[1])
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
+import requests
+import streamlit as st
 
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402
-from lotterylab import games, store  # noqa: E402
+from app import shared
+from lotterylab import games, store
 
 st.title("🗃️ Data")
 st.caption(
@@ -55,8 +50,12 @@ for key in shared.GAME_KEYS:
             with st.spinner(f"Downloading {spec.name} history…"):
                 try:
                     path = store.fetch_raw(key)
-                except Exception as e:
-                    st.error(f"Fetch failed: {e}")
+                except (
+                    OSError,
+                    ValueError,
+                    requests.RequestException,
+                ) as error:
+                    st.error(f"Fetch failed: {error}")
                 else:
                     st.success(f"Wrote `{os.path.basename(path)}`.")
                     shared.load_history.clear()

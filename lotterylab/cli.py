@@ -19,22 +19,22 @@ import sys
 from . import analytics, ev, games, simulate
 from .backtest import backtest
 from .combinatorics import odds_table
+from .store import load_canonical
 from .strategy import BUILTIN_STRATEGIES, get_strategy
+from .synth import synth_history
 from .wheeling import cycled_specials, spread_numbers, wheel_report
 
 
 def _load(game: str, use_synth: bool, n: int = 1500):
+    """Load either real canonical history or deterministic synthetic draws."""
     spec = games.get(game)
     if use_synth:
-        from .synth import synth_history
-
         return synth_history(spec, n, seed=0)
-    from .store import load_canonical
-
     return load_canonical(game)
 
 
-def cmd_odds(args):
+def cmd_odds(_args):
+    """Print exact match-3 and jackpot odds for every game."""
     print("Exact odds (a fair draw — every combination equally likely):\n")
     print(f"  {'Game':22s} {'Matrix':16s} {'Match 3':>12s} {'Jackpot':>18s}")
     for r in odds_table():
@@ -46,6 +46,7 @@ def cmd_odds(args):
 
 
 def cmd_prove(args):
+    """Run every built-in strategy against one game and print z-scores."""
     game = args.game or "eurodreams"
     spec = games.get(game)
     hist = _load(game, args.synth, n=args.synth_n)
@@ -98,6 +99,7 @@ def cmd_prove(args):
 
 
 def cmd_backtest(args):
+    """Run one strategy through the backtest harness."""
     spec = games.get(args.game)
     hist = _load(args.game, args.synth, n=args.synth_n)
     res = backtest(
@@ -107,10 +109,11 @@ def cmd_backtest(args):
 
 
 def cmd_wheel(args):
+    """Build and print a covering-design wheel for one game."""
     spec = games.get(args.game)
     if args.numbers:
         chosen = sorted(set(args.numbers))
-        bad = [x for x in chosen if not (1 <= x <= spec.main_max)]
+        bad = [x for x in chosen if x < 1 or x > spec.main_max]
         if bad:
             print(
                 f"Out of range for {spec.name} (main pool is 1-{spec.main_max}): {bad}",
@@ -167,6 +170,7 @@ def cmd_wheel(args):
 
 
 def cmd_ev(args):
+    """Compare EV for birthday-heavy and high-number reference tickets."""
     spec = games.get(args.game)
     k = spec.main_count
     birthday = tuple(range(1, k + 1))  # 1,2,3,... all <= 31
@@ -182,13 +186,15 @@ def cmd_ev(args):
 
 
 def cmd_freq(args):
+    """Print frequency bars and a chi-square uniformity test."""
     spec = games.get(args.game)
     hist = _load(args.game, args.synth, n=args.synth_n)
     print(f"Frequency dashboard — {spec.name} ({len(hist)} draws)\n")
     print(analytics.ascii_bars(hist, spec))
 
 
-def cmd_wait(args):
+def cmd_wait(_args):
+    """Print expected and median wait for a match-3 hit by game."""
     print("Expected time until a single ticket finally matches 3 main numbers:\n")
     for spec in games.all_games():
         print(simulate.time_to_match3(spec))
@@ -196,49 +202,74 @@ def cmd_wait(args):
 
 
 def cmd_variance(args):
+    """Print Monte-Carlo season variance for one game."""
     spec = games.get(args.game)
     print(simulate.simulate_variance(spec, draws=args.draws, n_seasons=args.seasons))
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the argparse command tree."""
     p = argparse.ArgumentParser(prog="lotterylab", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
 
     def add_common(sp, synth_default=False):
-        sp.add_argument("--synth", action="store_true", default=synth_default,
-                        help="use provably-fair synthetic data instead of real history")
-        sp.add_argument("--synth-n", type=int, default=1500,
-                        help="number of synthetic draws (with --synth)")
+        """Add common real/synthetic data flags to a subcommand."""
+        sp.add_argument(
+            "--synth",
+            action="store_true",
+            default=synth_default,
+            help="use provably-fair synthetic data instead of real history",
+        )
+        sp.add_argument(
+            "--synth-n",
+            type=int,
+            default=1500,
+            help="number of synthetic draws (with --synth)",
+        )
 
-    sp = sub.add_parser("odds"); sp.set_defaults(func=cmd_odds)
+    sp = sub.add_parser("odds")
+    sp.set_defaults(func=cmd_odds)
 
     sp = sub.add_parser("prove")
     sp.add_argument("game", nargs="?", choices=list(games.GAMES))
     sp.add_argument("--tickets", type=int, default=1)
-    add_common(sp); sp.set_defaults(func=cmd_prove)
+    add_common(sp)
+    sp.set_defaults(func=cmd_prove)
 
     sp = sub.add_parser("backtest")
     sp.add_argument("game", choices=list(games.GAMES))
     sp.add_argument("strategy", choices=list(BUILTIN_STRATEGIES))
     sp.add_argument("--tickets", type=int, default=1)
-    add_common(sp); sp.set_defaults(func=cmd_backtest)
+    add_common(sp)
+    sp.set_defaults(func=cmd_backtest)
 
     sp = sub.add_parser("wheel")
     sp.add_argument("game", choices=list(games.GAMES))
-    sp.add_argument("-n", type=int, default=9,
-                    help="how many numbers to wheel (default 9, spread across the pool)")
-    sp.add_argument("--numbers", type=int, nargs="+",
-                    help="explicit numbers to wheel, e.g. --numbers 4 11 19 27 35 38")
+    sp.add_argument(
+        "-n",
+        type=int,
+        default=9,
+        help="how many numbers to wheel (default 9, spread across the pool)",
+    )
+    sp.add_argument(
+        "--numbers",
+        type=int,
+        nargs="+",
+        help="explicit numbers to wheel, e.g. --numbers 4 11 19 27 35 38",
+    )
     sp.set_defaults(func=cmd_wheel)
 
     sp = sub.add_parser("ev")
-    sp.add_argument("game", choices=list(games.GAMES)); sp.set_defaults(func=cmd_ev)
+    sp.add_argument("game", choices=list(games.GAMES))
+    sp.set_defaults(func=cmd_ev)
 
     sp = sub.add_parser("freq")
     sp.add_argument("game", choices=list(games.GAMES))
-    add_common(sp); sp.set_defaults(func=cmd_freq)
+    add_common(sp)
+    sp.set_defaults(func=cmd_freq)
 
-    sp = sub.add_parser("wait"); sp.set_defaults(func=cmd_wait)
+    sp = sub.add_parser("wait")
+    sp.set_defaults(func=cmd_wait)
 
     sp = sub.add_parser("variance")
     sp.add_argument("game", choices=list(games.GAMES))
@@ -250,6 +281,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None):
+    """Parse command-line arguments and dispatch the selected command."""
     parser = build_parser()
     args = parser.parse_args(argv)
     args.func(args)

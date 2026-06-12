@@ -16,10 +16,12 @@ def three_plus_main_probability(spec: GameSpec) -> float:
 
 
 def expected_three_plus(spec: GameSpec, n_draws: int, n_tickets: int = 1) -> float:
+    """Expected count of >=3-main hits across draws and tickets."""
     return three_plus_main_probability(spec) * n_draws * n_tickets
 
 
 def all_tier_probabilities(spec: GameSpec) -> dict[tuple[int, int], float]:
+    """Complete probability distribution over every main/special hit tier."""
     out = {}
     for m in range(spec.main_count + 1):
         for s in range(spec.special_count + 1):

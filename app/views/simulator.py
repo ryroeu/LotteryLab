@@ -2,24 +2,19 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import altair as alt
+import numpy as np
+import pandas as pd
+import streamlit as st
 
-_APP = str(Path(__file__).resolve().parents[1])
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
-
-import altair as alt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402
-from lotterylab import games  # noqa: E402
-from lotterylab.simulate import time_to_match3, variance_samples  # noqa: E402
+from app import shared
+from lotterylab import games
+from lotterylab.simulate import time_to_match3, variance_samples
 
 st.title("⏳ Time & Variance")
-st.caption("How long until a single ticket matches 3 — and what a season of playing really feels like.")
+st.caption(
+    "How long until a single ticket matches 3 — and what a season of playing really feels like."
+)
 
 # --- Waiting time ------------------------------------------------------------------
 
@@ -45,8 +40,8 @@ st.dataframe(
     },
 )
 st.caption(
-    "One ticket per draw. EuroDreams' median wait is ~3 months; Powerball's is over a year — "
-    "that's what *an order of magnitude friendlier* means in practice."
+    "One ticket per draw. EuroDreams' median wait is ~3 months; Powerball's is "
+    "over a year — that's what *an order of magnitude friendlier* means in practice."
 )
 
 st.divider()
@@ -63,7 +58,14 @@ c1, c2, c3 = st.columns([2, 1, 1])
 with c1:
     game = shared.game_selector()
 with c2:
-    draws = st.slider("Draws per season", 26, 520, 104, step=26, help="104 ≈ a year at 2 draws/week")
+    draws = st.slider(
+        "Draws per season",
+        26,
+        520,
+        104,
+        step=26,
+        help="104 ≈ a year at 2 draws/week",
+    )
 with c3:
     seasons = st.slider("Seasons", 500, 10_000, 2000, step=500)
 
@@ -72,7 +74,10 @@ spec = games.get(game)
 
 @st.cache_data(show_spinner="Simulating seasons…")
 def run_variance(game_key: str, n_draws: int, n_seasons: int):
-    return variance_samples(games.get(game_key), draws=n_draws, n_seasons=n_seasons, seed=0)
+    """Simulate repeated one-ticket seasons for a game."""
+    return variance_samples(
+        games.get(game_key), draws=n_draws, n_seasons=n_seasons, seed=0
+    )
 
 
 nets, any3_fraction = run_variance(game, draws, seasons)
@@ -81,7 +86,11 @@ spend = draws * spec.price
 m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Season spend", shared.fmt_money(spend, spec.currency, 0), border=True)
 m2.metric("Mean net", shared.fmt_money(float(nets.mean()), spec.currency, 0), border=True)
-m3.metric("Median net", shared.fmt_money(float(np.percentile(nets, 50)), spec.currency, 0), border=True)
+m3.metric(
+    "Median net",
+    shared.fmt_money(float(np.percentile(nets, 50)), spec.currency, 0),
+    border=True,
+)
 m4.metric("Best season", shared.fmt_money(float(nets.max()), spec.currency, 0), border=True)
 m5.metric(
     "Seasons with a 3-match",
@@ -95,7 +104,11 @@ bars = (
     alt.Chart(hist_df)
     .mark_bar(color="#F2B636", opacity=0.85)
     .encode(
-        x=alt.X("net:Q", bin=alt.Bin(maxbins=60), title=f"Net result per season ({spec.currency})"),
+        x=alt.X(
+            "net:Q",
+            bin=alt.Bin(maxbins=60),
+            title=f"Net result per season ({spec.currency})",
+        ),
         y=alt.Y("count():Q", title="Seasons"),
         tooltip=[alt.Tooltip("count():Q", title="Seasons")],
     )

@@ -93,6 +93,8 @@ def verify_guarantee(tickets, numbers: list[int], t: int = 3) -> bool:
 
 @dataclass
 class WheelReport:
+    """A verified wheel plus its cost and conditional guarantee statistics."""
+
     game: str
     chosen: tuple[int, ...]
     k: int
@@ -122,6 +124,7 @@ class WheelReport:
 def wheel_report(
     spec: GameSpec, chosen: list[int], *, t: int = 3, verify: bool = True
 ) -> WheelReport:
+    """Build a covering design report for a chosen main-number pool."""
     k = spec.main_count
     tickets = covering_design(chosen, k, t)
     if verify and not verify_guarantee(tickets, chosen, t):

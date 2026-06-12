@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class GameSpec:
+    """Lottery matrix, prize, and display metadata for one game."""
+
     key: str
     name: str
     # Main pool: draw ``main_count`` distinct balls from 1..main_max
@@ -45,9 +47,11 @@ class GameSpec:
 
     @property
     def special_pool(self) -> int:
+        """Size of the special-ball pool."""
         return self.special_max
 
     def matches_label(self, main_hits: int, special_hits: int) -> str:
+        """Human-readable label for a prize tier."""
         s = f"{main_hits} main"
         if self.special_count:
             s += f" + {special_hits} {self.special_name}"
@@ -162,6 +166,7 @@ GAMES: dict[str, GameSpec] = {
 
 
 def get(game: str) -> GameSpec:
+    """Look up a game by registry key."""
     try:
         return GAMES[game]
     except KeyError:
@@ -171,4 +176,5 @@ def get(game: str) -> GameSpec:
 
 
 def all_games() -> list[GameSpec]:
+    """Return every registered game in display order."""
     return list(GAMES.values())

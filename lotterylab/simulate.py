@@ -11,12 +11,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .baseline import all_tier_probabilities
 from .combinatorics import expected_wait_draws, match_main_exactly, median_wait_draws
 from .games import GameSpec
 
 
 @dataclass
 class WaitReport:
+    """Calendar-time summary for waiting until one match-3 hit."""
+
     game: str
     p_match3: float
     one_in: int
@@ -45,6 +48,7 @@ DRAWS_PER_WEEK = {
 
 
 def time_to_match3(spec: GameSpec) -> WaitReport:
+    """Calculate expected and median waits for one ticket to match 3 mains."""
     p = match_main_exactly(spec, 3)
     dpw = DRAWS_PER_WEEK.get(spec.key, 2)
     exp_d = expected_wait_draws(p)
@@ -63,6 +67,8 @@ def time_to_match3(spec: GameSpec) -> WaitReport:
 
 @dataclass
 class VarianceReport:
+    """Summary statistics for repeated one-ticket simulated seasons."""
+
     game: str
     strategy: str
     draws: int
@@ -96,7 +102,6 @@ def variance_samples(
     array plus the fraction of seasons containing at least one 3-match.
     """
     rng = np.random.default_rng(seed)
-    from .baseline import all_tier_probabilities
 
     # all_tier_probabilities is the COMPLETE distribution over (main, special)
     # outcomes and already sums to 1 — every losing tier (incl. (0,0)) is in it.

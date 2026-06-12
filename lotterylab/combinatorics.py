@@ -6,9 +6,9 @@ published odds (Powerball match-3 = 1 in 557, jackpot 1 in 292,201,338, etc.).
 
 from __future__ import annotations
 
-from math import comb
+from math import comb, log
 
-from .games import GameSpec
+from .games import GameSpec, all_games
 
 
 def hypergeom_pmf(pool: int, drawn: int, picked: int, hits: int) -> float:
@@ -25,10 +25,12 @@ def hypergeom_pmf(pool: int, drawn: int, picked: int, hits: int) -> float:
 
 
 def main_hits_pmf(spec: GameSpec, hits: int) -> float:
+    """Probability of exactly ``hits`` main-number matches."""
     return hypergeom_pmf(spec.main_max, spec.main_count, spec.main_count, hits)
 
 
 def special_hits_pmf(spec: GameSpec, hits: int) -> float:
+    """Probability of exactly ``hits`` special-number matches."""
     if spec.special_count == 0:
         return 1.0 if hits == 0 else 0.0
     return hypergeom_pmf(
@@ -42,14 +44,17 @@ def tier_probability(spec: GameSpec, main_hits: int, special_hits: int) -> float
 
 
 def match_main_exactly(spec: GameSpec, m: int) -> float:
+    """Probability of exactly ``m`` main-number matches."""
     return main_hits_pmf(spec, m)
 
 
 def match_main_at_least(spec: GameSpec, m: int) -> float:
+    """Probability of at least ``m`` main-number matches."""
     return sum(main_hits_pmf(spec, h) for h in range(m, spec.main_count + 1))
 
 
 def jackpot_probability(spec: GameSpec) -> float:
+    """Probability of the jackpot tier for one ticket."""
     return tier_probability(spec, spec.main_count, spec.special_count)
 
 
@@ -78,19 +83,15 @@ def expected_wait_draws(p: float) -> float:
 
 def median_wait_draws(p: float) -> float:
     """Median draws until first success: ceil(ln 0.5 / ln(1-p))."""
-    import math
-
     if p <= 0:
         return float("inf")
     if p >= 1:
         return 1.0
-    return math.log(0.5) / math.log(1.0 - p)
+    return log(0.5) / log(1.0 - p)
 
 
 def odds_table() -> list[dict]:
     """A compact summary row per game, for the README / CLI ``odds`` command."""
-    from .games import all_games
-
     rows = []
     for spec in all_games():
         p3 = match_main_exactly(spec, 3)

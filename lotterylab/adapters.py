@@ -15,6 +15,7 @@ from .schema import Draw
 
 
 def _parse_date(value, fmts: list[str]) -> _dt.date:
+    """Parse a source date using known formats before falling back to pandas."""
     for fmt in fmts:
         try:
             return _dt.datetime.strptime(str(value).strip(), fmt).date()
@@ -25,6 +26,7 @@ def _parse_date(value, fmts: list[str]) -> _dt.date:
 
 
 def parse_powerball(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
+    """Parse a NY Open Data Powerball snapshot."""
     draws = []
     for _, row in raw.iterrows():
         nums = [int(x) for x in str(row["Winning Numbers"]).split()]
@@ -46,6 +48,7 @@ def parse_powerball(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
 
 # Mega Millions uses the same NY layout but a separate "Mega Ball" column.
 def parse_megamillions(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
+    """Parse a NY Open Data Mega Millions snapshot."""
     draws = []
     for _, row in raw.iterrows():
         main = [int(x) for x in str(row["Winning Numbers"]).split()][: spec.main_count]
@@ -65,6 +68,7 @@ def parse_megamillions(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
 
 
 def parse_euromillions(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
+    """Parse a normalized EuroMillions snapshot."""
     main_cols = ["Ball 1", "Ball 2", "Ball 3", "Ball 4", "Ball 5"]
     star_cols = ["Lucky Star 1", "Lucky Star 2"]
     draws = []
@@ -82,6 +86,7 @@ def parse_euromillions(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
 
 
 def parse_eurodreams(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
+    """Parse a normalized EuroDreams snapshot."""
     main_cols = [f"Number {i}" for i in range(1, 7)]
     draws = []
     for _, row in raw.iterrows():
@@ -106,6 +111,7 @@ ADAPTERS = {
 
 
 def parse(game: str, raw: pd.DataFrame) -> list[Draw]:
+    """Parse raw rows for one registered game into canonical draws."""
     spec = get(game)
     adapter = ADAPTERS[game]
     return adapter(raw, spec)

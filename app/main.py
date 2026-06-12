@@ -7,16 +7,7 @@ two levers that are real (covering designs and jackpot-share EV).
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-_APP = str(Path(__file__).resolve().parent)
-if _APP not in sys.path:
-    sys.path.insert(0, _APP)
-
-import streamlit as st  # noqa: E402
-
-import shared  # noqa: E402,F401  (bootstraps the repo root onto sys.path)
+import streamlit as st
 
 st.set_page_config(
     page_title="Lottery Lab",
