@@ -33,9 +33,7 @@ def special_hits_pmf(spec: GameSpec, hits: int) -> float:
     """Probability of exactly ``hits`` special-number matches."""
     if spec.special_count == 0:
         return 1.0 if hits == 0 else 0.0
-    return hypergeom_pmf(
-        spec.special_max, spec.special_count, spec.special_count, hits
-    )
+    return hypergeom_pmf(spec.special_max, spec.special_count, spec.special_count, hits)
 
 
 def tier_probability(spec: GameSpec, main_hits: int, special_hits: int) -> float:
@@ -99,7 +97,11 @@ def odds_table() -> list[dict]:
             {
                 "game": spec.name,
                 "matrix": f"{spec.main_count}/{spec.main_max}"
-                + (f" + {spec.special_count}/{spec.special_max}" if spec.special_count else ""),
+                + (
+                    f" + {spec.special_count}/{spec.special_max}"
+                    if spec.special_count
+                    else ""
+                ),
                 "p_match3": p3,
                 "match3_one_in": round(1 / p3) if p3 else None,
                 "jackpot_one_in": jackpot_odds(spec),

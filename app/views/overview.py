@@ -36,7 +36,9 @@ for col, r in zip(cols, rows):
             ),
             border=True,
         )
-st.caption("Cards show **match-3 odds** — the realistic small win, exact to the draw matrix.")
+st.caption(
+    "Cards show **match-3 odds** — the realistic small win, exact to the draw matrix."
+)
 
 df = pd.DataFrame(
     {

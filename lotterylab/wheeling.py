@@ -104,7 +104,7 @@ class WheelReport:
     cost: float
     currency: str
     guarantee: str
-    p_condition: float            # P(>= t of chosen numbers are drawn)
+    p_condition: float  # P(>= t of chosen numbers are drawn)
     expected_tmatch_per_draw: float
     expected_draws_between_hits: float
 

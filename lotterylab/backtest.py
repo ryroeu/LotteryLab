@@ -24,7 +24,9 @@ from .strategy import Strategy
 from .validate import validate_ticket
 
 
-def score_ticket(ticket, draw_main: set[int], draw_special: set[int]) -> tuple[int, int]:
+def score_ticket(
+    ticket, draw_main: set[int], draw_special: set[int]
+) -> tuple[int, int]:
     """Count main and special matches for one ticket against one draw."""
     main, special = ticket
     return len(set(main) & draw_main), len(set(special) & draw_special)
@@ -59,9 +61,9 @@ class BacktestResult:
             f"  draws evaluated : {self.n_draws}  (tickets played: {opportunities})",
             f"  >=3 main hits   : {self.three_plus_hits}  "
             f"(rate {self.three_plus_rate:.5f}, 1 in "
-            f"{round(1/self.three_plus_rate) if self.three_plus_rate else float('inf')})",
+            f"{round(1 / self.three_plus_rate) if self.three_plus_rate else float('inf')})",
             f"  baseline rate   : {self.baseline_three_plus_rate:.5f}  "
-            f"(1 in {round(1/self.baseline_three_plus_rate)})",
+            f"(1 in {round(1 / self.baseline_three_plus_rate)})",
             f"  z vs baseline   : {self.z_vs_baseline:+.2f}  "
             f"({'no edge' if abs(self.z_vs_baseline) < 2 else 'INVESTIGATE'})",
             f"  spend / win     : {self.spent:,.2f} / {self.won:,.2f} {self.currency}  "

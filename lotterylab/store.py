@@ -113,7 +113,9 @@ def _parse_fdj(content: bytes, n_main: int, special_cols: list[str]) -> list[dic
     rows = []
     for _, r in df.iterrows():
         try:
-            date = _dt.datetime.strptime(str(r["date_de_tirage"]).strip(), "%d/%m/%Y").date()
+            date = _dt.datetime.strptime(
+                str(r["date_de_tirage"]).strip(), "%d/%m/%Y"
+            ).date()
             main = sorted(int(r[c]) for c in main_cols)
             special = sorted(int(r[c]) for c in special_cols)
         except (ValueError, TypeError):
@@ -140,7 +142,9 @@ def _download_fdj(sources: list[str], n_main: int, special_cols: list[str]) -> d
     return by_date
 
 
-def _write_fdj_snapshot(game: str, today: _dt.date, header: list[str], by_date: dict) -> str:
+def _write_fdj_snapshot(
+    game: str, today: _dt.date, header: list[str], by_date: dict
+) -> str:
     """Write merged FDJ draws to one combined snapshot in the game's adapter layout."""
     if not by_date:
         raise ValueError(
@@ -200,7 +204,9 @@ def fetch_eurodreams(*, today: _dt.date | None = None) -> str:
     return _write_fdj_snapshot("eurodreams", today, header, by_date)
 
 
-def fetch_raw(game: str, *, today: _dt.date | None = None, validate: bool = True) -> str:
+def fetch_raw(
+    game: str, *, today: _dt.date | None = None, validate: bool = True
+) -> str:
     """Download a fresh snapshot to data/raw/<game>/. Returns the new path.
 
     Network side-effect; not exercised by the offline test suite. With
@@ -289,7 +295,9 @@ def load_canonical(
             continue  # unparsable / empty snapshot — fall back to an older one
 
         if verbose:
-            note = "" if idx == 0 else f" [fell back past {idx} newer broken snapshot(s)]"
+            note = (
+                "" if idx == 0 else f" [fell back past {idx} newer broken snapshot(s)]"
+            )
             print(
                 f"[{game}] loaded {len(kept)} draws from {os.path.basename(path)}"
                 f"{note} (dropped {dropped_era} pre-{cutoff} + "

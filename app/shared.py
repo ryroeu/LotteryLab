@@ -119,7 +119,9 @@ def run_backtest(
 def data_source_caption(game: str, synth: bool, synth_n: int) -> None:
     """One consistent line under each page's controls saying what data is in use."""
     if synth:
-        st.caption(f"Using **{synth_n:,} synthetic fair draws** (uniform by construction).")
+        st.caption(
+            f"Using **{synth_n:,} synthetic fair draws** (uniform by construction)."
+        )
     else:
         status = history_status(game)
         if status:

@@ -10,7 +10,9 @@ from app import shared
 from lotterylab import analytics, games
 
 st.title("📊 Frequency")
-st.caption("How often each main number has been drawn — plus the test that shows it means nothing.")
+st.caption(
+    "How often each main number has been drawn — plus the test that shows it means nothing."
+)
 
 st.warning(analytics.DISCLAIMER, icon="🧊")
 
