@@ -106,7 +106,7 @@ m5.metric(
 hist_df = pd.DataFrame({"net": nets})
 bars = (
     alt.Chart(hist_df)
-    .mark_bar(color="#F2B636", opacity=0.85)
+    .mark_bar(color=shared.ACCENT, opacity=0.85)
     .encode(
         x=alt.X(
             "net:Q",

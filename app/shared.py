@@ -14,6 +14,11 @@ from lotterylab.synth import synth_history
 GAME_KEYS: list[str] = list(games.GAMES)
 
 CURRENCY_SYMBOL = {"USD": "$", "EUR": "€"}
+
+# Brand accent for charts and highlights — the RYNANCE blue
+# (RYNANCE/web/src/theme.css, --ryn-blue). Keep in sync with
+# .streamlit/config.toml [theme] primaryColor.
+ACCENT = "#2786D9"
 DATA_LOAD_ERRORS = SNAPSHOT_PARSE_ERRORS
 
 DISCLAIMER = (

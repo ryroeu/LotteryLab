@@ -14,7 +14,7 @@ st.caption(
     "How often each main number has been drawn — plus the test that shows it means nothing."
 )
 
-st.warning(analytics.DISCLAIMER, icon="🧊")
+st.info(analytics.DISCLAIMER, icon="🧊")
 
 left, right = st.columns([2, 1])
 with left:
@@ -46,7 +46,7 @@ bars = (
             alt.Tooltip("number:O", title="Number"),
             alt.Tooltip("count:Q", title="Times drawn"),
         ],
-        color=alt.value("#F2B636"),
+        color=alt.value(shared.ACCENT),
     )
 )
 rule = (
