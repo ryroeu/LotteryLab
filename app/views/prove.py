@@ -84,7 +84,7 @@ rule = (
 )
 points = (
     alt.Chart(table)
-    .mark_circle(size=180, color="#F2B636")
+    .mark_circle(size=180, color=shared.ACCENT)
     .encode(
         x=alt.X(
             "rate:Q",

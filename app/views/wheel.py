@@ -93,7 +93,7 @@ m4.metric(
 )
 
 st.success(f"**Guarantee:** {report.guarantee}.", icon="🔒")
-st.warning(
+st.info(
     f"**Honest note:** the guarantee covers the {spec.main_count} main numbers only"
     + (
         f" — the {spec.special_name} (1–{spec.special_max}) is an independent pick "

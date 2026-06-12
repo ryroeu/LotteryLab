@@ -103,7 +103,7 @@ ev_df = pd.DataFrame(
 )
 bars = (
     alt.Chart(ev_df)
-    .mark_bar(color="#F2B636", opacity=0.9)
+    .mark_bar(color=shared.ACCENT, opacity=0.9)
     .encode(
         x=alt.X("ev:Q", title=f"Expected value per ticket ({spec.currency})"),
         y=alt.Y("ticket:N", title=None, sort=list(reports)),
@@ -121,7 +121,7 @@ st.caption(
     "Every bar stays under it: EV per unit spent is always < 1 — you still lose, just less."
 )
 
-st.warning(
+st.info(
     "**Honest note:** the probability of winning is identical for every ticket above. "
     "Only the expected *share* of a pari-mutuel jackpot differs — it does nothing for "
     "fixed lower-tier prizes.",
