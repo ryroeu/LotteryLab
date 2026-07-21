@@ -17,16 +17,12 @@ dependencies = [
 
 [project.optional-dependencies]
 ui = ["streamlit>=1.49"]
-dev = ["pytest>=8.0", "ruff>=0.9"]
 
 [project.scripts]
 lotterylab = "lotterylab.cli:main"
 
 [tool.setuptools]
 packages = ["lotterylab"]
-
-[tool.pytest.ini_options]
-pythonpath = ["."]
 
 [tool.pylint.design]
 max-args = 6
