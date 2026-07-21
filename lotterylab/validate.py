@@ -7,6 +7,8 @@ outputs, and the backtest harness, so an impossible ticket can never slip throug
 
 from __future__ import annotations
 
+from numbers import Integral
+
 from .games import GameSpec
 
 Ticket = tuple[tuple[int, ...], tuple[int, ...]]  # (main, special)
@@ -24,6 +26,8 @@ def check_pool(values, count: int, lo: int, hi: int, label: str) -> None:
     if len(set(vals)) != count:
         raise InvalidTicket(f"{label}: duplicate numbers in {vals}")
     for v in vals:
+        if isinstance(v, bool) or not isinstance(v, Integral):
+            raise InvalidTicket(f"{label}: {v!r} is not an integer")
         if v < lo or v > hi:
             raise InvalidTicket(f"{label}: {v} out of range [{lo}, {hi}]")
 

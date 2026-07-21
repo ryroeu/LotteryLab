@@ -30,8 +30,8 @@ RAW_DIR = os.path.join(ROOT, "data", "raw")
 CACHE_DIR = os.path.join(ROOT, "data", "cache")
 
 # Project-wide floor: only ever use draws from 2018-01-01 onward. Combined with
-# each game's main_matrix_since (whichever is later) so the uniform "2018 to present"
-# cut never re-introduces a stale matrix (every game's current matrix predates 2018).
+# each game's matrix-change date (whichever is later) so the uniform
+# "2018 to present" cut never re-introduces a stale main or special-ball pool.
 MIN_DATE = _dt.date(2018, 1, 1)
 
 _UA = {"User-Agent": "Mozilla/5.0 (compatible; lotterylab/0.1)"}
@@ -151,13 +151,25 @@ def _write_fdj_snapshot(
             f"FDJ {game} fetch produced no draws — the FDJ sources may have changed."
         )
     rows = sorted(by_date.values(), key=lambda r: r["date"])
+    buffer = io.StringIO(newline="")
+    writer = _csv.writer(buffer)
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow(
+            [row["date"].isoformat(), *row["main"], *row["special"], row["draw"]]
+        )
+    content = buffer.getvalue().encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()[:8]
+    timestamp = _dt.datetime.now().strftime("%H%M%S")
     os.makedirs(os.path.join(RAW_DIR, game), exist_ok=True)
-    path = os.path.join(RAW_DIR, game, f"{today.isoformat()}__fdj-combined.csv")
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        w = _csv.writer(f)
-        w.writerow(header)
-        for r in rows:
-            w.writerow([r["date"].isoformat(), *r["main"], *r["special"], r["draw"]])
+    filename = f"{today.isoformat()}__zz-{timestamp}__fdj-{digest}.csv"
+    path = os.path.join(RAW_DIR, game, filename)
+    try:
+        with open(path, "xb") as output:
+            output.write(content)
+    except FileExistsError:
+        # Same content fetched within the same second: return the immutable file.
+        pass
     return path
 
 
@@ -265,12 +277,12 @@ def load_canonical(
             f"Run fetch_raw({game!r}) or add a CSV."
         )
 
-    # Effective cutoff = the later of the 2018 floor and the game's matrix change.
+    # Effective cutoff = the later of the 2018 floor and either pool's last change.
     cutoff = None
     if modern_only:
         cutoff = MIN_DATE
-        if spec.main_matrix_since and spec.main_matrix_since > cutoff:
-            cutoff = spec.main_matrix_since
+        if spec.matrix_since and spec.matrix_since > cutoff:
+            cutoff = spec.matrix_since
 
     for idx, path in enumerate(snapshots):
         try:

@@ -4,10 +4,10 @@ Pool sizes, ball counts, prices, and (approximate) prize tables live here so tha
 combinatorics, wheeling, and EV never hardcode a game.
 
 A note on matrices: real lotteries change their ball pools over time (Powerball
-went to 5/69 + 1/26 on 2015-10-07; Mega Millions to 5/70 mains on 2017-10-31).
-A CSV downloaded today therefore mixes eras. ``main_matrix_since`` records when
-the *current main pool* took effect; the data layer filters older draws out so the
-odds and backtests are computed against a single, consistent matrix.
+went to 5/69 + 1/26 on 2015-10-07; Mega Millions reduced its special pool in 2025).
+A CSV downloaded today therefore mixes eras. ``matrix_since`` records when the
+complete current matrix took effect; the data layer filters older draws out so odds
+and backtests use one consistent matrix.
 
 Prize tables are keyed by ``(main_hits, special_hits)``. They are APPROXIMATE and
 illustrative — pari-mutuel games (EuroMillions, EuroDreams) pay variable amounts
@@ -37,8 +37,8 @@ class GameSpec:
     # Economics
     price: float
     currency: str
-    # Earliest draw date for which the current main matrix is valid (filtering)
-    main_matrix_since: _dt.date | None
+    # Earliest draw date for which both current ball pools are valid (filtering)
+    matrix_since: _dt.date | None
     # Approximate prize table: {(main_hits, special_hits): payout}. The jackpot
     # tier is given separately so ROI uses a finite nominal estimate.
     prize_table: dict[tuple[int, int], float] = field(default_factory=dict)
@@ -49,6 +49,11 @@ class GameSpec:
     def special_pool(self) -> int:
         """Size of the special-ball pool."""
         return self.special_max
+
+    @property
+    def main_matrix_since(self) -> _dt.date | None:
+        """Backward-compatible alias for the complete matrix cutoff."""
+        return self.matrix_since
 
     def matches_label(self, main_hits: int, special_hits: int) -> str:
         """Human-readable label for a prize tier."""
@@ -71,7 +76,7 @@ GAMES: dict[str, GameSpec] = {
         special_name="Powerball",
         price=2.00,
         currency="USD",
-        main_matrix_since=_dt.date(2015, 10, 7),
+        matrix_since=_dt.date(2015, 10, 7),
         prize_table={
             (5, 0): 1_000_000,
             (4, 1): 50_000,
@@ -95,19 +100,21 @@ GAMES: dict[str, GameSpec] = {
         special_name="Mega Ball",
         price=5.00,
         currency="USD",
-        main_matrix_since=_dt.date(2017, 10, 31),  # 5/70 mains stable since then
+        matrix_since=_dt.date(2025, 4, 8),  # Mega Ball pool changed 25 -> 24
         prize_table={
-            (5, 0): 1_000_000,
-            (4, 1): 10_000,
-            (4, 0): 500,
-            (3, 1): 200,
-            (3, 0): 10,
-            (2, 1): 10,
-            (1, 1): 7,
-            (0, 1): 5,
+            # Every play has a random 2x/3x/4x/5x/10x multiplier. Its expected
+            # value is 3x, so these are expected rather than guaranteed payouts.
+            (5, 0): 3_000_000,
+            (4, 1): 30_000,
+            (4, 0): 1_500,
+            (3, 1): 600,
+            (3, 0): 30,
+            (2, 1): 30,
+            (1, 1): 21,
+            (0, 1): 15,
         },
         jackpot_tier=(5, 1),
-        jackpot_estimate=20_000_000,
+        jackpot_estimate=50_000_000,
     ),
     "euromillions": GameSpec(
         key="euromillions",
@@ -119,7 +126,7 @@ GAMES: dict[str, GameSpec] = {
         special_name="Lucky Star",
         price=2.50,
         currency="EUR",
-        main_matrix_since=_dt.date(2016, 9, 24),
+        matrix_since=_dt.date(2016, 9, 24),
         prize_table={  # approximate typical pari-mutuel values
             (5, 1): 130_000,
             (5, 0): 30_000,
@@ -147,7 +154,7 @@ GAMES: dict[str, GameSpec] = {
         special_name="Dream Number",
         price=2.50,
         currency="EUR",
-        main_matrix_since=_dt.date(2023, 11, 6),
+        matrix_since=_dt.date(2023, 11, 6),
         prize_table={  # approximate; top tiers are annuities shown as lump nominal
             (6, 0): 2_500_000,
             (5, 1): 2_000,

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import combinations
+from numbers import Integral
 
 from .combinatorics import hypergeom_pmf
 from .games import GameSpec
@@ -27,8 +28,19 @@ from .games import GameSpec
 
 def spread_numbers(n: int, lo: int, hi: int) -> list[int]:
     """n distinct numbers evenly spread across [lo, hi] — a neutral default pool."""
-    if n >= hi - lo + 1:
+    if isinstance(n, bool) or not isinstance(n, Integral) or n <= 0:
+        raise ValueError("n must be a positive integer")
+    if lo > hi:
+        raise ValueError("lo must not exceed hi")
+    pool_size = hi - lo + 1
+    if n > pool_size:
+        raise ValueError(
+            f"Cannot choose {n} distinct numbers from a pool of {pool_size}"
+        )
+    if n == pool_size:
         return list(range(lo, hi + 1))
+    if n == 1:
+        return [lo]
     out: list[int] = []
     for i in range(n):
         v = round(lo + (hi - lo) * i / (n - 1))
@@ -60,6 +72,17 @@ def covering_design(numbers: list[int], k: int, t: int = 3) -> list[tuple[int, .
     Covering Repository for optimal numbers) but is correct — the guarantee holds.
     """
     numbers = sorted(numbers)
+    if any(
+        isinstance(number, bool) or not isinstance(number, Integral)
+        for number in numbers
+    ):
+        raise ValueError("numbers must be integers")
+    if len(numbers) != len(set(numbers)):
+        raise ValueError("numbers must be distinct")
+    if isinstance(k, bool) or not isinstance(k, Integral) or k <= 0:
+        raise ValueError("k must be a positive integer")
+    if isinstance(t, bool) or not isinstance(t, Integral) or not 1 <= t <= k:
+        raise ValueError("t must be an integer in [1, k]")
     if len(numbers) < k:
         raise ValueError(f"Need at least k={k} numbers to wheel, got {len(numbers)}.")
     uncovered = set(combinations(numbers, t))
@@ -84,6 +107,8 @@ def covering_design(numbers: list[int], k: int, t: int = 3) -> list[tuple[int, .
 
 def verify_guarantee(tickets, numbers: list[int], t: int = 3) -> bool:
     """Brute-force proof: every t-subset of ``numbers`` is covered by some ticket."""
+    if isinstance(t, bool) or not isinstance(t, Integral) or t <= 0:
+        raise ValueError("t must be a positive integer")
     covered = set()
     for tk in tickets:
         for ts in combinations(tk, t):
@@ -125,6 +150,18 @@ def wheel_report(
     spec: GameSpec, chosen: list[int], *, t: int = 3, verify: bool = True
 ) -> WheelReport:
     """Build a covering design report for a chosen main-number pool."""
+    if any(
+        isinstance(number, bool) or not isinstance(number, Integral)
+        for number in chosen
+    ):
+        raise ValueError("chosen numbers must be integers")
+    if len(chosen) != len(set(chosen)):
+        raise ValueError("chosen numbers must be distinct")
+    bad = [number for number in chosen if not 1 <= number <= spec.main_max]
+    if bad:
+        raise ValueError(
+            f"chosen numbers out of range [1, {spec.main_max}]: {sorted(bad)}"
+        )
     k = spec.main_count
     tickets = covering_design(chosen, k, t)
     if verify and not verify_guarantee(tickets, chosen, t):

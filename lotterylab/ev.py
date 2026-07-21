@@ -14,9 +14,12 @@ by how much they'd have to share.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import comb, isfinite
+from numbers import Integral
 
 from .combinatorics import jackpot_odds, jackpot_probability, tier_probability
 from .games import GameSpec, get
+from .validate import check_pool
 
 # Heuristic over-pick multiplier for "birthday" numbers.
 BIRTHDAY_WEIGHT = 1.8
@@ -32,11 +35,22 @@ def popularity_multiplier(main: tuple[int, ...], spec: GameSpec) -> float:
     """Relative likelihood a random player picks this exact main combination,
     normalised so a uniform pick == 1.0. < 1 means less popular (shares less).
     """
-    mean_w = sum(number_weight(n) for n in range(1, spec.main_max + 1)) / spec.main_max
+    check_pool(main, spec.main_count, 1, spec.main_max, f"{spec.key} main")
+
+    # Normalize by the exact mean product over combinations sampled without
+    # replacement. Raising the mean single-number weight to k is subtly wrong
+    # because the number weights in a valid ticket are dependent.
+    elementary = [0.0] * (spec.main_count + 1)
+    elementary[0] = 1.0
+    for number in range(1, spec.main_max + 1):
+        weight = number_weight(number)
+        for size in range(spec.main_count, 0, -1):
+            elementary[size] += weight * elementary[size - 1]
+    mean_product = elementary[spec.main_count] / comb(spec.main_max, spec.main_count)
     prod = 1.0
     for n in main:
         prod *= number_weight(n)
-    return prod / (mean_w ** len(main))
+    return prod / mean_product
 
 
 def _expected_inv_one_plus_binom(n: int, q: float) -> float:
@@ -84,6 +98,14 @@ def ticket_ev(
 ) -> EVReport:
     """Estimate one ticket's EV under the jackpot-sharing popularity model."""
     jackpot = spec.jackpot_estimate if jackpot is None else jackpot
+    if not isfinite(jackpot) or jackpot < 0:
+        raise ValueError("jackpot must be a finite, non-negative amount")
+    if (
+        isinstance(n_players, bool)
+        or not isinstance(n_players, Integral)
+        or n_players < 0
+    ):
+        raise ValueError("n_players must be a non-negative integer")
     pop = popularity_multiplier(main, spec)
 
     # Jackpot sharing: other players who also picked the winning combination.

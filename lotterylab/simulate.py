@@ -8,6 +8,7 @@ median wait for a single ticket to finally match three.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Integral
 
 import numpy as np
 
@@ -101,6 +102,10 @@ def variance_samples(
     outcomes (no need to simulate ball-by-ball). Returns the per-season net
     array plus the fraction of seasons containing at least one 3-match.
     """
+    for name, value in (("draws", draws), ("n_seasons", n_seasons)):
+        if isinstance(value, bool) or not isinstance(value, Integral) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer")
+
     rng = np.random.default_rng(seed)
 
     # all_tier_probabilities is the COMPLETE distribution over (main, special)

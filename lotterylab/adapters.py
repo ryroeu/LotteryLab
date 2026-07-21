@@ -1,7 +1,8 @@
 """Per-game CSV adapters: messy source format -> list[Draw].
 
 Each adapter absorbs one game's quirks (column names, date formats, the
-space-packed "Winning Numbers" string) and returns canonical, validated draws.
+space-packed "Winning Numbers" string) and returns canonical draws. The store
+validates those draws against the current game matrix before exposing them.
 """
 
 from __future__ import annotations

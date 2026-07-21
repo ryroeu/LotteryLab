@@ -48,7 +48,6 @@ results = {
 any_res = next(iter(results.values()))
 p3 = any_res.baseline_three_plus_rate
 opportunities = any_res.n_draws * n_tickets
-se_rate = (p3 * (1 - p3) / opportunities) ** 0.5 if opportunities else 0.0
 
 b1, b2, b3 = st.columns(3)
 b1.metric("Chance line (≥3 main)", f"{p3:.5f}", help=shared.fmt_one_in(p3), border=True)
@@ -69,13 +68,19 @@ table = pd.DataFrame(
         "verdict": [verdict_of(r.z_vs_baseline) for r in results.values()],
     }
 )
+chart_table = table.assign(
+    lo=[max(0.0, p3 - 2 * r.baseline_three_plus_se) for r in results.values()],
+    hi=[p3 + 2 * r.baseline_three_plus_se for r in results.values()],
+)
 
-band = (
-    alt.Chart(
-        pd.DataFrame({"lo": [max(0.0, p3 - 2 * se_rate)], "hi": [p3 + 2 * se_rate]})
+bands = (
+    alt.Chart(chart_table)
+    .mark_rule(opacity=0.5, color="#9AA4B2", strokeWidth=5)
+    .encode(
+        x="lo:Q",
+        x2="hi:Q",
+        y=alt.Y("strategy:N", title=None, sort=table["strategy"].tolist()),
     )
-    .mark_rect(opacity=0.15, color="#9AA4B2")
-    .encode(x="lo:Q", x2="hi:Q")
 )
 rule = (
     alt.Chart(pd.DataFrame({"baseline": [p3]}))
@@ -101,9 +106,10 @@ points = (
         ],
     )
 )
-st.altair_chart((band + rule + points).properties(height=280), width="stretch")
+st.altair_chart((bands + rule + points).properties(height=280), width="stretch")
 st.caption(
-    "Red line = the exact hypergeometric baseline; grey band = ±2 standard errors. "
+    "Red line = the exact hypergeometric baseline; grey bars = ±2 standard errors, "
+    "adjusted for overlap between tickets. "
     "`order_stat_mean` **is** the old LSTM (`lstm_ghost` is its alias) — no better than `random`."
 )
 

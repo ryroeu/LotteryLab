@@ -6,7 +6,9 @@ published odds (Powerball match-3 = 1 in 557, jackpot 1 in 292,201,338, etc.).
 
 from __future__ import annotations
 
-from math import comb, log
+from functools import lru_cache
+from math import ceil, comb, log
+from numbers import Integral
 
 from .games import GameSpec, all_games
 
@@ -17,6 +19,13 @@ def hypergeom_pmf(pool: int, drawn: int, picked: int, hits: int) -> float:
     Symmetric in (drawn, picked): choosing ``drawn`` balls from ``pool`` and then
     asking how many land in your fixed ``picked``-set.
     """
+    values = (pool, drawn, picked, hits)
+    if any(
+        isinstance(value, bool) or not isinstance(value, Integral) for value in values
+    ):
+        raise ValueError("pool, drawn, picked, and hits must be integers")
+    if pool < 0 or not 0 <= drawn <= pool or not 0 <= picked <= pool:
+        raise ValueError("require pool >= 0 and 0 <= drawn, picked <= pool")
     if hits < 0 or hits > picked or hits > drawn:
         return 0.0
     if picked - hits > pool - drawn:
@@ -49,6 +58,49 @@ def match_main_exactly(spec: GameSpec, m: int) -> float:
 def match_main_at_least(spec: GameSpec, m: int) -> float:
     """Probability of at least ``m`` main-number matches."""
     return sum(main_hits_pmf(spec, h) for h in range(m, spec.main_count + 1))
+
+
+@lru_cache(maxsize=None)
+def _joint_match_at_least(
+    pool: int, drawn: int, picked: int, overlap: int, minimum: int
+) -> float:
+    """Joint hit probability for two fixed picks with a known overlap."""
+    denominator = comb(pool, drawn)
+    a_only = picked - overlap
+    outside = pool - (2 * picked - overlap)
+    total = 0
+    for shared_hits in range(overlap + 1):
+        for a_hits in range(a_only + 1):
+            if shared_hits + a_hits < minimum:
+                continue
+            for b_hits in range(a_only + 1):
+                if shared_hits + b_hits < minimum:
+                    continue
+                outside_hits = drawn - shared_hits - a_hits - b_hits
+                if not 0 <= outside_hits <= outside:
+                    continue
+                total += (
+                    comb(overlap, shared_hits)
+                    * comb(a_only, a_hits)
+                    * comb(a_only, b_hits)
+                    * comb(outside, outside_hits)
+                )
+    return total / denominator
+
+
+def joint_match_main_at_least(spec: GameSpec, overlap: int, m: int) -> float:
+    """P(two fixed tickets both match >=m mains), given their main overlap."""
+    if isinstance(overlap, bool) or not isinstance(overlap, Integral):
+        raise ValueError("overlap must be an integer")
+    if not 0 <= overlap <= spec.main_count:
+        raise ValueError(f"overlap must be in [0, {spec.main_count}]")
+    if isinstance(m, bool) or not isinstance(m, Integral):
+        raise ValueError("m must be an integer")
+    if not 0 <= m <= spec.main_count:
+        raise ValueError(f"m must be in [0, {spec.main_count}]")
+    return _joint_match_at_least(
+        spec.main_max, spec.main_count, spec.main_count, overlap, m
+    )
 
 
 def jackpot_probability(spec: GameSpec) -> float:
@@ -85,7 +137,7 @@ def median_wait_draws(p: float) -> float:
         return float("inf")
     if p >= 1:
         return 1.0
-    return log(0.5) / log(1.0 - p)
+    return float(ceil(log(0.5) / log(1.0 - p)))
 
 
 def odds_table() -> list[dict]:

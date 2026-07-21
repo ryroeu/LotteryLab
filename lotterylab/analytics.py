@@ -31,6 +31,8 @@ def uniformity_test(history: pd.DataFrame, spec: GameSpec) -> dict:
     """Chi-square goodness-of-fit vs uniform over the main pool."""
     counts = frequency(history, spec)[1:]  # drop index 0
     n = counts.sum()
+    if n == 0:
+        raise ValueError("uniformity_test requires at least one observed ball")
     expected = np.full(spec.main_max, n / spec.main_max)
     chi2, p = stats.chisquare(counts, expected)
     return {

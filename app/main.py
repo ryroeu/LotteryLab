@@ -17,7 +17,7 @@ _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-import streamlit as st  # noqa: E402
+import streamlit as st  # noqa: E402  # pylint: disable=wrong-import-position
 
 st.set_page_config(
     page_title="Lottery Lab",

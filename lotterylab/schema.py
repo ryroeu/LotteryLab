@@ -1,7 +1,8 @@
 """Canonical draw schema + tidy DataFrame conversion.
 
-One ``Draw`` per drawing. Balls are stored sorted ascending and validated in-range
-and unique at construction time, so every downstream consumer can trust them.
+One ``Draw`` per drawing. Balls are normalized to sorted ascending order at
+construction time; the canonical store validates adapter output against the
+applicable game matrix before downstream analysis.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ class Draw:
 
 def draws_to_frame(draws: list[Draw], spec: GameSpec) -> pd.DataFrame:
     """Tidy frame: game, date, draw_id, m1..mk, s1..sj."""
+    columns = ["game", "date", "draw_id", *main_columns(spec), *special_columns(spec)]
     rows = []
     for d in draws:
         row = {"game": d.game, "date": d.date, "draw_id": d.draw_id}
@@ -41,7 +43,7 @@ def draws_to_frame(draws: list[Draw], spec: GameSpec) -> pd.DataFrame:
         for j in range(spec.special_count):
             row[f"s{j + 1}"] = d.special[j]
         rows.append(row)
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows, columns=columns)
     if not df.empty:
         df = df.sort_values("date").reset_index(drop=True)
     return df

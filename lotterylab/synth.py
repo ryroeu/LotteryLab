@@ -9,6 +9,7 @@ whole harness, and lets everything run without a network.
 from __future__ import annotations
 
 import datetime as _dt
+from numbers import Integral
 
 import numpy as np
 import pandas as pd
@@ -19,6 +20,8 @@ from .schema import Draw, draws_to_frame
 
 def synth_history(spec: GameSpec, n_draws: int, seed: int = 0) -> pd.DataFrame:
     """Generate uniform synthetic draws for one game as a canonical frame."""
+    if isinstance(n_draws, bool) or not isinstance(n_draws, Integral) or n_draws < 0:
+        raise ValueError("n_draws must be a non-negative integer")
     rng = np.random.default_rng(seed)
     start = _dt.date(2018, 1, 1)
     draws = []
