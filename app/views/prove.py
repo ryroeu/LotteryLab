@@ -109,7 +109,8 @@ st.altair_chart((bands + rule + points).properties(height=280), width="stretch")
 st.caption(
     "Red line = the exact hypergeometric baseline; grey bars = ±2 standard errors, "
     "adjusted for overlap between tickets. "
-    "`order_stat_mean` **is** the old LSTM (`lstm_ghost` is its alias) — no better than `random`."
+    "`order_stat_mean` is the constant ticket a mean-squared-error regressor settles on — "
+    "no better than `random`."
 )
 
 st.dataframe(

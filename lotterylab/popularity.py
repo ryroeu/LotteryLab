@@ -1,8 +1,7 @@
 """Which numbers do other players pick? — measured, not assumed.
 
 Picking unpopular numbers never changes the chance of winning; it changes how many
-people you share a prize pool with. The old model hard-coded one guess ("birthday
-numbers are 1.8x over-picked"). FDJ's history lets us measure it instead: every
+people you share a prize pool with. FDJ's history lets us measure that: every
 draw records how many tickets matched 2, 3, 4... numbers, and those counts swing
 with *which* numbers came up. Draws full of popular numbers produce more winners.
 

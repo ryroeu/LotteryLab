@@ -120,7 +120,7 @@ def order_statistic_means(pool: int, count: int) -> list[float]:
     """E[i-th smallest] for ``count`` distinct draws from 1..pool.
 
     This is exactly the fixed vector an MSE regressor on *sorted* draws converges
-    to — the centroid the deleted LSTM was quietly learning.
+    to.
     """
     factor = (pool + 1) / (count + 1)
     return [round(i * factor, 4) for i in range(1, count + 1)]

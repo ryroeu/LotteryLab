@@ -2,8 +2,8 @@
 
 Every built-in here exists to be run through the backtest harness and shown to be
 statistically indistinguishable from random. That includes ``OrderStatMean``, the
-fixed vector the deleted LSTM converged to, and ``LSTMGhost``, an alias documenting
-that the original deep-learning approach was mathematically equivalent to it.
+fixed vector any model trained to minimise squared error on sorted draws ends up
+predicting.
 
 A ticket is ``(main_tuple, special_tuple)``. ``generate`` receives a ``Past``: what
 was knowable before the draw being predicted. The harness builds it incrementally
@@ -162,8 +162,9 @@ class LastDrawEcho(Strategy):
 class OrderStatMean(Strategy):
     """The fixed order-statistic-mean vector an MSE regressor converges to.
 
-    This is, mathematically, what the deleted LSTM was learning: a constant ticket
-    of per-position averages. Included precisely to show it is no better than random.
+    Fair draws carry no information about the next one, so the error-minimising
+    prediction is the same every time: a constant ticket of per-position averages.
+    Included precisely to show it is no better than random.
     """
 
     name = "order_stat_mean"
@@ -181,8 +182,7 @@ class OrderStatMean(Strategy):
 
     @staticmethod
     def _dedupe_round(means, pool_max, count) -> tuple[int, ...]:
-        # Round, then repair collisions/out-of-range so the ticket is *valid*
-        # (the old predictors skipped this and could emit impossible tickets).
+        # Round, then repair collisions/out-of-range so the ticket is *valid*.
         chosen: list[int] = []
         for m in means:
             v = int(round(m))
@@ -193,12 +193,6 @@ class OrderStatMean(Strategy):
                     v = 1
             chosen.append(v)
         return tuple(sorted(chosen[:count]))
-
-
-class LSTMGhost(OrderStatMean):
-    """Documentation alias: the repo's original LSTM == OrderStatMean, no better."""
-
-    name = "lstm_ghost"
 
 
 class BiasedHigh(Strategy):
@@ -224,7 +218,6 @@ BUILTIN_STRATEGIES: dict[str, type[Strategy]] = {
         ColdNumbers,
         LastDrawEcho,
         OrderStatMean,
-        LSTMGhost,
         BiasedHigh,
     ]
 }

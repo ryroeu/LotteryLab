@@ -1,9 +1,8 @@
 """The backtest harness — the heart of the project.
 
 Walk forward over real draws. At each draw, ask the strategy for ticket(s) using
-ONLY the history available before that draw (no leakage — the exact bug the LSTM
-committed by fitting its scaler on the whole dataset). Score the matches, tally
-the tiers, and compare the realized match distribution to the exact baseline.
+ONLY the history available before that draw (no leakage). Score the matches,
+tally the tiers, and compare the realized match distribution to the exact baseline.
 
 What a strategy may know is carried in a ``Past`` that the loop updates after each
 draw is scored — running counts instead of recounting all history every step, so a

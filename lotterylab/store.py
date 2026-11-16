@@ -1,8 +1,8 @@
 """Data store — immutable raw snapshots of official draw history.
 
 Source CSVs live under ``<data dir>/raw/<game>/<snapshot>.csv`` and are NEVER
-overwritten (the old scripts downloaded and clobbered the committed file in place,
-destroying provenance). ``load_canonical`` reads the newest snapshot through the
+overwritten, so every result can be traced to the file it came from.
+``load_canonical`` reads the newest snapshot through the
 game's adapter, filters to the current matrix era, validates, and returns a tidy
 frame. ``load_payouts`` returns the per-rank winner counts and prize amounts that
 the FDJ history files publish alongside the balls.

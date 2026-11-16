@@ -65,8 +65,8 @@ with c1:
     with st.container(border=True):
         st.markdown("##### ⚖️ You can't predict the draw")
         st.markdown(
-            "Run `random`, `hot`, `cold`, `last_echo` and the ghost of the old "
-            "LSTM through a walk-forward backtest: they **all** land within noise "
+            "Run `random`, `hot`, `cold`, `last_echo` and `order_stat_mean` "
+            "through a walk-forward backtest: they **all** land within noise "
             "of the exact hypergeometric baseline. *(→ Strategies vs Chance)*"
         )
 with c2:

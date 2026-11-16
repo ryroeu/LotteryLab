@@ -140,11 +140,11 @@ run once and then respond instantly.
 ### The three real ideas
 
 - **You can't predict the draw.** The `prove` command demonstrates it: `random`,
-  `hot`, `cold`, `last_echo`, and `order_stat_mean` (the constant vector the old
-  LSTM converged to) all land within noise of the hypergeometric baseline. The
-  uniformity test is corrected for drawing without replacement — the textbook
-  chi-square is too lenient on lottery data (about 1% false alarms on fair 6/40
-  draws instead of 5%).
+  `hot`, `cold`, `last_echo`, and `order_stat_mean` (the constant ticket a
+  mean-squared-error regressor settles on) all land within noise of the
+  hypergeometric baseline. The uniformity test is corrected for drawing without
+  replacement — the textbook chi-square is too lenient on lottery data (about 1%
+  false alarms on fair 6/40 draws instead of 5%).
 - **Unpopular numbers raise expected payout, not win probability.** Prizes paid
   from a shared pool are split among that draw's winners, so avoiding the numbers
   everyone plays means a bigger slice *if* you win — at every shared rank, not just
@@ -190,7 +190,7 @@ data/raw/<game>/    immutable source snapshots (never overwritten)
 ## Data
 
 Source CSVs live under `data/raw/<game>/` as immutable, timestamped snapshots and
-are never overwritten (the old scripts clobbered them in place). The loader keeps
+are never overwritten. The loader keeps
 draws since each game's current matrix took effect (`GameSpec.matrix_since`), so
 odds and backtests are always computed against one consistent set of rules (e.g.
 old-matrix Mega Millions rows are dropped automatically). It tries snapshots

@@ -1,4 +1,4 @@
-"""Ticket / draw validity — the constraint the old ``np.round`` predictors ignored.
+"""Ticket / draw validity.
 
 A real ticket has the right count of balls, every ball in range, and no duplicates
 within a pool. These functions are the single boundary used by adapters, strategy
