@@ -42,6 +42,23 @@ def test_data_command_runs(argv, capsys):
     assert len(capsys.readouterr().out) > 200
 
 
+def test_fetch_tries_every_game_then_fails_if_any_did(monkeypatch, capsys):
+    attempted = []
+
+    def fake_fetch(game):
+        attempted.append(game)
+        if game == "loto":
+            raise ValueError("source blocked")
+        return store.newest_snapshot(game)
+
+    monkeypatch.setattr(store, "fetch_raw", fake_fetch)
+    with pytest.raises(SystemExit) as exit_info:
+        main(["fetch", "loto", "eurodreams"])
+    assert attempted == ["loto", "eurodreams"]
+    assert exit_info.value.code not in (0, None)
+    assert "FAILED" in capsys.readouterr().out
+
+
 def test_bad_wheel_numbers_exit_cleanly():
     with pytest.raises(SystemExit):
         main(["wheel", "eurodreams", "--numbers", "1", "2", "3"])

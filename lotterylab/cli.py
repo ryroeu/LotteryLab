@@ -362,7 +362,11 @@ def cmd_variance(args):
 
 
 def cmd_fetch(args):
-    """Download fresh official history for the given games (default: all)."""
+    """Download fresh official history for the given games (default: all).
+
+    Every game is attempted; the command then exits non-zero if any of them
+    failed, so a scheduled run can't look healthy while one source is down.
+    """
     targets = args.games or list(store.FETCHABLE)
     failures = 0
     for game in targets:
@@ -379,8 +383,8 @@ def cmd_fetch(args):
             f"  {game:13s} {state:13s} {len(draws):>5d} draws through "
             f"{draws['date'].iloc[-1]}  ({path.rsplit('/', 1)[-1]})"
         )
-    if failures == len(targets):
-        sys.exit(1)
+    if failures:
+        sys.exit(f"{failures} of {len(targets)} sources could not be fetched.")
 
 
 def build_parser() -> argparse.ArgumentParser:
