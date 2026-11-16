@@ -97,8 +97,9 @@ over-predicts: 1.13 realised against 1.27 forecast.)
   combination and about 44% for a random one.
 - `ev <game> --jackpot N` adds the rollover: the top prize's value grows with the
   jackpot while extra players dilute it. For Loto the model puts break-even for the
-  least-picked numbers near a €21M jackpot (22 of the last 1,100 draws offered
-  that much); for EuroMillions it sits above the €250M cap, so never.
+  least-picked numbers near a €21M jackpot (29 of the 1,100 draws since
+  November 2019 offered that much); for EuroMillions it sits above the €250M cap,
+  so never.
 - Read "break-even" as an average over millions of draws. Almost all of that value
   sits in a jackpot you will almost certainly never hit, so the typical outcome of
   playing is still a loss. French lottery winnings are untaxed, so the figures are
