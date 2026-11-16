@@ -15,9 +15,6 @@ An honest statistical sandbox for lottery numbers, pointed at the French games.
 > 3. **Engineers** **covering designs** (wheeling) that *guarantee* a small-prize
 >    match at a known cost.
 
-This replaced an earlier set of LSTM "predictors." They couldn't work, and not for
-lack of tuning — see [Why the old approach couldn't work](#why-the-old-approach-couldnt-work).
-
 ## The odds (exact)
 
 | Game | Matrix | Match 3 main | Jackpot |
@@ -157,27 +154,6 @@ run once and then respond instantly.
   guarantees a 3-match *if* ≥3 of your K chosen numbers are drawn. It never changes
   the draw odds or per-ticket EV — it buys determinism at a fixed, honest cost
   (which exceeds what a 3-match pays).
-
-## Why the old approach couldn't work
-
-The original scripts fed a sliding window of past draws into an LSTM and regressed
-the next draw with mean-squared error. Three nested reasons it was doomed:
-
-1. **No information.** Fair draws are i.i.d.; the mutual information between history
-   and the next draw is exactly zero. No architecture can extract a signal that
-   isn't there.
-2. **MSE → the mean.** The error-minimizing output is the *conditional mean*, which
-   under independence is just the *unconditional mean* — a fixed vector,
-   independent of whatever recent draws you feed in.
-3. **Sorting made it look plausible.** Because draws are stored ascending, that mean
-   is the vector of **order-statistic means** (Powerball → `[12, 23, 35, 47, 58]`).
-   The model was learning the average *sorted* ticket — an artifact of storage
-   order — and printing it back every run. Try `backtest powerball order_stat_mean`:
-   it's the old model, and it's no better than `random`.
-
-(It was also training EuroMillions on a single example, scaling the Powerball ball
-against the white-ball range, and emitting tickets with duplicate balls — but those
-are bugs on top of a foundation that couldn't work regardless.)
 
 ## Layout
 
