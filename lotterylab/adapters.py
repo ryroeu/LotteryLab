@@ -103,11 +103,29 @@ def parse_eurodreams(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
     return draws
 
 
+def parse_loto(raw: pd.DataFrame, spec: GameSpec) -> list[Draw]:
+    """Parse a normalized French Loto snapshot."""
+    main_cols = [f"Ball {i}" for i in range(1, 6)]
+    draws = []
+    for _, row in raw.iterrows():
+        draws.append(
+            Draw(
+                game=spec.key,
+                date=_parse_date(row["Date"], ["%Y-%m-%d"]),
+                draw_id=str(row["DrawNumber"]) if "DrawNumber" in raw.columns else None,
+                main=tuple(int(row[c]) for c in main_cols),
+                special=(int(row["Chance"]),),
+            )
+        )
+    return draws
+
+
 ADAPTERS = {
     "powerball": parse_powerball,
     "megamillions": parse_megamillions,
     "euromillions": parse_euromillions,
     "eurodreams": parse_eurodreams,
+    "loto": parse_loto,
 }
 
 

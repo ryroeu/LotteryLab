@@ -6,3 +6,8 @@ requests>=2.28
 
 # Web UI (streamlit run app/main.py)
 streamlit>=1.49
+altair>=5
+
+# Development (pytest; ruff check . && ruff format --check .)
+pytest>=8
+ruff>=0.6

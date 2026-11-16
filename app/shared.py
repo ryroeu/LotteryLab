@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from lotterylab import games
+from lotterylab import ev, games
 from lotterylab.backtest import BacktestResult, backtest
 from lotterylab.store import SNAPSHOT_PARSE_ERRORS, load_canonical
 from lotterylab.strategy import get_strategy
@@ -26,6 +26,26 @@ DISCLAIMER = (
     "winning, because nothing can. The expected value of every ticket is well "
     "under its price — please gamble responsibly."
 )
+
+
+@st.cache_resource(show_spinner=False)
+def market(game: str) -> ev.Market:
+    """The game as measured from disk: real prize table, number popularity,
+    ticket sales and raffle value (static fallbacks where a game has no data)."""
+    return ev.market(game)
+
+
+def spec(game: str) -> games.GameSpec:
+    """A game's spec with its prize table calibrated to observed payouts."""
+    return market(game).spec
+
+
+def clear_data_caches() -> None:
+    """Forget everything derived from the snapshots (after a fetch)."""
+    load_history.clear()
+    history_status.clear()
+    market.clear()
+    run_backtest.clear()
 
 
 def symbol(currency: str) -> str:
@@ -116,9 +136,10 @@ def run_backtest(
     game: str, strategy: str, n_tickets: int, synth: bool, synth_n: int
 ) -> BacktestResult:
     """Run and cache one walk-forward strategy backtest."""
-    spec = games.get(game)
     hist = load_history(game, synth, synth_n)
-    return backtest(get_strategy(strategy), hist, spec, n_tickets=n_tickets, seed=1)
+    return backtest(
+        get_strategy(strategy), hist, spec(game), n_tickets=n_tickets, seed=1
+    )
 
 
 def data_source_caption(game: str, synth: bool, synth_n: int) -> None:

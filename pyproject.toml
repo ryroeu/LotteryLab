@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lotterylab"
-version = "0.1.0"
-description = "An honest statistical sandbox for lottery analysis: prove nothing predicts a fair draw, then engineer guaranteed low-tier hits with covering designs."
+version = "0.2.0"
+description = "An honest statistical sandbox for lottery analysis: prove nothing predicts a fair draw, then measure the levers that are real — shared prize pools, jackpot size, and covering designs."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "pandas>=2.0",
     "numpy>=1.24",
@@ -16,13 +16,26 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ui = ["streamlit>=1.49"]
+ui = ["streamlit>=1.49", "altair>=5"]
+dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
 lotterylab = "lotterylab.cli:main"
 
 [tool.setuptools]
 packages = ["lotterylab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 88
+extend-exclude = ["build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # the formatter owns line length; long strings are fine
 
 [tool.pylint.design]
 max-args = 6

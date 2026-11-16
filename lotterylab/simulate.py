@@ -39,19 +39,10 @@ class WaitReport:
         )
 
 
-# Approximate draws per week per game (for translating draws -> calendar time).
-DRAWS_PER_WEEK = {
-    "powerball": 3,
-    "megamillions": 2,
-    "euromillions": 2,
-    "eurodreams": 2,  # Monday & Thursday
-}
-
-
 def time_to_match3(spec: GameSpec) -> WaitReport:
     """Calculate expected and median waits for one ticket to match 3 mains."""
     p = match_main_exactly(spec, 3)
-    dpw = DRAWS_PER_WEEK.get(spec.key, 2)
+    dpw = spec.draws_per_week
     exp_d = expected_wait_draws(p)
     med_d = median_wait_draws(p)
     return WaitReport(

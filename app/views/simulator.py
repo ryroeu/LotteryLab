@@ -69,14 +69,14 @@ with c2:
 with c3:
     seasons = st.slider("Seasons", 500, 10_000, 2000, step=500)
 
-spec = games.get(game)
+spec = shared.spec(game)
 
 
 @st.cache_data(show_spinner="Simulating seasons…")
 def run_variance(game_key: str, n_draws: int, n_seasons: int):
     """Simulate repeated one-ticket seasons for a game."""
     return variance_samples(
-        games.get(game_key), draws=n_draws, n_seasons=n_seasons, seed=0
+        shared.spec(game_key), draws=n_draws, n_seasons=n_seasons, seed=0
     )
 
 

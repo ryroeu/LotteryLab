@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 
 from app import shared
-from lotterylab import games
 from lotterylab.strategy import BUILTIN_STRATEGIES
 
 st.title("⚖️ Strategies vs Chance")
@@ -24,7 +23,7 @@ with mid:
 with right:
     synth, synth_n = shared.synth_controls()
 
-spec = games.get(game)
+spec = shared.spec(game)
 
 hist = shared.require_history(game, synth, synth_n)
 

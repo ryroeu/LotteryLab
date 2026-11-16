@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 
 from app import shared
-from lotterylab import games
 from lotterylab.wheeling import cycled_specials, spread_numbers, wheel_report
 
 MAX_WHEEL = 14  # covering designs grow fast beyond this
@@ -20,7 +19,7 @@ st.caption(
 left, right = st.columns([1, 2])
 with left:
     game = shared.game_selector()
-spec = games.get(game)
+spec = shared.spec(game)
 
 with right:
     mode = (
@@ -60,7 +59,7 @@ else:
 @st.cache_data(show_spinner="Building the covering design…")
 def build_wheel(game_key: str, numbers: tuple[int, ...]):
     """Build and cache a wheel report for a selected number pool."""
-    return wheel_report(games.get(game_key), list(numbers))
+    return wheel_report(shared.spec(game_key), list(numbers))
 
 
 report = build_wheel(game, tuple(chosen))

@@ -5,6 +5,10 @@ ONLY the history available before that draw (no leakage — the exact bug the LS
 committed by fitting its scaler on the whole dataset). Score the matches, tally
 the tiers, and compare the realized match distribution to the exact baseline.
 
+What a strategy may know is carried in a ``Past`` that the loop updates after each
+draw is scored — running counts instead of recounting all history every step, so a
+50,000-draw synthetic run takes seconds rather than tens of minutes.
+
 The headline finding, reproduced for every strategy: the number of >=3-main hits
 sits within a couple of standard errors of the hypergeometric expectation. No edge.
 """
@@ -22,7 +26,7 @@ from .baseline import three_plus_main_probability
 from .combinatorics import joint_match_main_at_least
 from .games import GameSpec
 from .schema import frame_to_draws
-from .strategy import Strategy
+from .strategy import Past, Strategy
 from .validate import validate_ticket
 
 
@@ -156,14 +160,23 @@ def backtest(
     p3 = three_plus_main_probability(spec)
     null_variance = 0.0
 
-    for t in range(warmup, n):
-        past = history.iloc[:t]
-        tickets = _generated_tickets(strategy, past, spec, n_tickets, rng)
-        draw_tier, draw_three_plus, draw_won = _score_tickets(tickets, draws[t], spec)
-        tier.update(draw_tier)
-        three_plus += draw_three_plus
-        won += draw_won
-        null_variance += _null_hit_count_variance(tickets, spec, p3)
+    past = Past(
+        n_draws=0,
+        main_counts=np.zeros(spec.main_max + 1, dtype=np.int64),
+        history=history,
+    )
+    for t, actual in enumerate(draws):
+        if t >= warmup:
+            tickets = _generated_tickets(strategy, past, spec, n_tickets, rng)
+            draw_tier, draw_three_plus, draw_won = _score_tickets(tickets, actual, spec)
+            tier.update(draw_tier)
+            three_plus += draw_three_plus
+            won += draw_won
+            null_variance += _null_hit_count_variance(tickets, spec, p3)
+        # Only now does this draw become part of what a strategy may know.
+        past.main_counts[list(actual.main)] += 1
+        past.last_main, past.last_special = actual.main, actual.special
+        past.n_draws = t + 1
 
     opportunities = (n - warmup) * n_tickets
     spent = opportunities * spec.price

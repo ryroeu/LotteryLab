@@ -1,0 +1,43 @@
+name: Refresh data
+
+# Downloads fresh official draw history and commits any new snapshots straight to
+# main. A snapshot is only written when the data actually changed, parses, and has
+# not lost draws, so a quiet or broken source produces no commit.
+on:
+  schedule:
+    - cron: "23 5 * * 0" # Sundays 05:23 UTC, after Saturday's Loto and Powerball
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Fetch
+        run: python -m lotterylab fetch
+      - name: Check the new data against the rules
+        run: pytest -q tests/test_real_data.py
+      - name: Commit new snapshots to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/raw
+          if git diff --cached --quiet; then
+            echo "No new draws."
+          else
+            git commit -m "data: refresh official draw snapshots"
+            git push
+          fi

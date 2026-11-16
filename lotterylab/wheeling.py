@@ -141,8 +141,9 @@ class WheelReport:
             f"  guarantee       : {self.guarantee}\n"
             f"  P(condition met): {self.p_condition:.4f}  "
             f"(>= {self.t} of your {len(self.chosen)} numbers drawn)\n"
-            f"  exp. {self.t}-match hits/draw : {self.expected_tmatch_per_draw:.4f}  "
-            f"(~1 every {self.expected_draws_between_hits:.1f} draws)"
+            f"  P(a >={self.t}-match ticket) per draw : "
+            f"{self.expected_tmatch_per_draw:.4f}  "
+            f"(~1 draw in {self.expected_draws_between_hits:.1f})"
         )
 
 
@@ -173,7 +174,8 @@ def wheel_report(
         hypergeom_pmf(spec.main_max, spec.main_count, len(chosen), h)
         for h in range(t, min(len(chosen), spec.main_count) + 1)
     )
-    # When the condition is met, the wheel guarantees a t-match ticket exists.
+    # A ticket can only match t if >= t chosen numbers are drawn, and then the
+    # wheel guarantees one does: so this is exactly P(at least one t-match ticket).
     exp_per_draw = p_condition
     between = 1 / exp_per_draw if exp_per_draw else float("inf")
 

@@ -1,9 +1,15 @@
-"""Data store — immutable raw snapshots, derived canonical cache.
+"""Data store — immutable raw snapshots of official draw history.
 
-Source CSVs live under ``data/raw/<game>/<snapshot>.csv`` and are NEVER overwritten
-(the old scripts downloaded and clobbered the committed file in place, destroying
-provenance). ``load_canonical`` reads the newest snapshot through the game's
-adapter, filters to the current matrix era, validates, and returns a tidy frame.
+Source CSVs live under ``<data dir>/raw/<game>/<snapshot>.csv`` and are NEVER
+overwritten (the old scripts downloaded and clobbered the committed file in place,
+destroying provenance). ``load_canonical`` reads the newest snapshot through the
+game's adapter, filters to the current matrix era, validates, and returns a tidy
+frame. ``load_payouts`` returns the per-rank winner counts and prize amounts that
+the FDJ history files publish alongside the balls.
+
+The data directory is, in order: ``$LOTTERYLAB_DATA``; the ``data/`` folder next to
+the package when running from a source checkout; otherwise ``~/.lotterylab/data``
+(so an installed ``lotterylab`` command still has somewhere to fetch into).
 """
 
 from __future__ import annotations
@@ -14,27 +20,20 @@ import glob
 import hashlib
 import io
 import os
+import re
+import warnings
 import zipfile
+from dataclasses import dataclass
 
 import pandas as pd
 import requests
 
 from . import adapters
-from .games import get
-from .schema import Draw, draws_to_frame
+from .games import GameSpec, get
+from .schema import Draw, draws_to_frame, main_columns, special_columns
 from .validate import InvalidTicket, validate_ticket
 
-# Repo root = two levels up from this file (lotterylab/store.py -> repo/)
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RAW_DIR = os.path.join(ROOT, "data", "raw")
-CACHE_DIR = os.path.join(ROOT, "data", "cache")
-
-# Project-wide floor: only ever use draws from 2018-01-01 onward. Combined with
-# each game's matrix-change date (whichever is later) so the uniform
-# "2018 to present" cut never re-introduces a stale main or special-ball pool.
-MIN_DATE = _dt.date(2018, 1, 1)
-
-_UA = {"User-Agent": "Mozilla/5.0 (compatible; lotterylab/0.1)"}
+_UA = {"User-Agent": "Mozilla/5.0 (compatible; lotterylab/0.2)"}
 SNAPSHOT_PARSE_ERRORS = (
     KeyError,
     OSError,
@@ -45,45 +44,114 @@ SNAPSHOT_PARSE_ERRORS = (
     pd.errors.ParserError,
 )
 
-# Single-CSV download URLs. fetch_raw writes a new timestamped snapshot and never
-# touches existing ones. (EuroMillions is multi-source — see EUROMILLIONS_FDJ_SOURCES.)
+# A fresh download must keep at least this share of the draws the newest snapshot
+# on disk already has, or it is treated as truncated and discarded.
+MIN_KEEP_FRACTION = 0.9
+
+# Single-CSV download URLs (NY Open Data).
 FETCH_URLS = {
     "powerball": "https://data.ny.gov/api/views/d6yy-54nr/rows.csv?accessType=DOWNLOAD",
     "megamillions": "https://data.ny.gov/api/views/5xaw-6ayf/rows.csv?accessType=DOWNLOAD",
 }
 
-# EuroMillions: FDJ (the French operator) publishes the official history split by
-# rule-era (the star pool changed over the years). All eras are served through the
-# draw-info API; the current-era document is updated in place. Together these cover
-# 2016-09 to present, which the 2018 floor trims to 2018+.
-EUROMILLIONS_FDJ_SOURCES = [
-    (
-        "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/"
-        "documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afc6"
-    ),
-    (
-        "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/"
-        "documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afd6"
-    ),
-    (
-        "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/"
-        "documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afe6"
-    ),
-]
+_FDJ_DOC = "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/documentations/"
 
-# EuroDreams launched 2023-11 with one stable matrix, so FDJ serves it as a single
-# live file via the draw-info API (boule_1..6 + numero_dream).
-EURODREAMS_FDJ_SOURCES = [
-    (
-        "https://www.sto.api.fdj.fr/anonymous/service-draw-info/v3/"
-        "documentations/1a2b3c4d-9876-4562-b3fc-2c963f66afa5"
+
+def _fdj(*suffixes: str) -> tuple[str, ...]:
+    return tuple(f"{_FDJ_DOC}1a2b3c4d-9876-4562-b3fc-2c963f66{s}" for s in suffixes)
+
+
+@dataclass(frozen=True)
+class FdjSource:
+    """How one game's FDJ history files map onto a combined snapshot.
+
+    FDJ (the French operator) publishes official history split by rule-era; the
+    current-era document is updated in place after every draw. ``rank_label`` is the
+    infix FDJ puts in its per-rank columns (``nombre_de_gagnant_au_rang1_<label>_en_
+    france``); Loto has none.
+    """
+
+    urls: tuple[str, ...]
+    fdj_special_cols: tuple[str, ...]
+    rank_label: str | None
+    date_col: str
+    main_cols: tuple[str, ...]
+    special_cols: tuple[str, ...]
+
+
+FDJ_SOURCES: dict[str, FdjSource] = {
+    # Star pool changed over the years, so EuroMillions is chunked into eras;
+    # together these cover 2016-09 to present.
+    "euromillions": FdjSource(
+        urls=_fdj("afc6", "afd6", "afe6"),
+        fdj_special_cols=("etoile_1", "etoile_2"),
+        rank_label="Euro_Millions",
+        date_col="DrawDate",
+        main_cols=("Ball 1", "Ball 2", "Ball 3", "Ball 4", "Ball 5"),
+        special_cols=("Lucky Star 1", "Lucky Star 2"),
     ),
-]
+    # EuroDreams launched 2023-11 with one stable matrix: a single live file.
+    "eurodreams": FdjSource(
+        urls=_fdj("afa5"),
+        fdj_special_cols=("numero_dream",),
+        rank_label="Euro_Dreams",
+        date_col="Date",
+        main_cols=tuple(f"Number {i}" for i in range(1, 7)),
+        special_cols=("Dream Number",),
+    ),
+    # Loto has been 5/49 + 1/10 since 2008-10; four files cover it to present.
+    "loto": FdjSource(
+        urls=_fdj("afm6", "afn6", "afo6", "afp6"),
+        fdj_special_cols=("numero_chance",),
+        rank_label=None,
+        date_col="Date",
+        main_cols=tuple(f"Ball {i}" for i in range(1, 6)),
+        special_cols=("Chance",),
+    ),
+}
+
+FETCHABLE = tuple(FETCH_URLS) + tuple(FDJ_SOURCES)
+
+
+# --- Locations -------------------------------------------------------------------
+
+
+def data_dir() -> str:
+    """Directory holding ``raw/<game>/`` snapshots (see the module docstring)."""
+    override = os.environ.get("LOTTERYLAB_DATA")
+    if override:
+        return os.path.abspath(os.path.expanduser(override))
+    checkout = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data"
+    )
+    if os.path.isdir(checkout):
+        return checkout
+    return os.path.join(os.path.expanduser("~"), ".lotterylab", "data")
+
+
+def raw_dir(game: str | None = None) -> str:
+    """The raw-snapshot directory, optionally for one game."""
+    base = os.path.join(data_dir(), "raw")
+    return os.path.join(base, game) if game else base
+
+
+_SNAPSHOT_STAMP = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:T(\d{6})|__zz-(\d{6}))?")
+
+
+def _snapshot_key(path: str) -> tuple[str, str, str]:
+    """Sort key: (date, time-of-day or '', name). Understands both name schemes
+    (``2026-11-16T093000__fdj-ab12cd34.csv`` and the older ``…__zz-093000__…``)."""
+    name = os.path.basename(path)
+    match = _SNAPSHOT_STAMP.match(name)
+    if not match:
+        return ("", "", name)
+    return (match.group(1), match.group(2) or match.group(3) or "", name)
 
 
 def all_snapshots(game: str) -> list[str]:
-    """All raw snapshots for a game, newest filename first."""
-    return sorted(glob.glob(os.path.join(RAW_DIR, game, "*.csv")), reverse=True)
+    """All raw snapshots for a game, newest first."""
+    paths = glob.glob(os.path.join(raw_dir(game), "*.csv"))
+    return sorted(paths, key=_snapshot_key, reverse=True)
 
 
 def newest_snapshot(game: str) -> str | None:
@@ -92,61 +160,137 @@ def newest_snapshot(game: str) -> str | None:
     return snaps[0] if snaps else None
 
 
-def _count_parsable_draws(game: str, path: str) -> int:
-    """How many draws this snapshot yields through the adapter (0 if unparsable)."""
+# --- FDJ parsing -----------------------------------------------------------------
+
+
+def _num(value) -> float | None:
+    """Parse an FDJ number ('1 234,50', '2000,00', '') to float, or None."""
+    if value is None:
+        return None
+    text = str(value).strip().replace(" ", "").replace(" ", "")
+    if not text or text.lower() == "nan":
+        return None
     try:
-        return len(adapters.parse(game, pd.read_csv(path)))
-    except SNAPSHOT_PARSE_ERRORS:
-        return 0
+        return float(text.replace(",", "."))
+    except ValueError:
+        return None
 
 
-def _parse_fdj(content: bytes, n_main: int, special_cols: list[str]) -> list[dict]:
-    """Parse one FDJ draw file (zip-of-CSV or raw CSV) to draw dicts.
+def _fdj_date(value) -> _dt.date:
+    text = str(value).strip()
+    for fmt in ("%d/%m/%Y", "%Y%m%d", "%d/%m/%y"):
+        try:
+            return _dt.datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"unrecognised FDJ date {text!r}")
 
-    FDJ format: semicolon-delimited, latin-1, columns ``boule_1..n_main`` plus the
-    given ``special_cols`` (etoile_1/etoile_2 for EuroMillions, numero_dream for
-    EuroDreams) and ``date_de_tirage`` as DD/MM/YYYY. ``index_col=False`` because
-    some files carry a trailing ';' that would otherwise make pandas adopt the first
-    column as the index and silently shift every column left. Returns [] if the
-    expected columns are absent.
+
+def _read_fdj_table(content: bytes) -> pd.DataFrame:
+    """One FDJ file (zip-of-CSV or raw CSV) as an all-strings frame.
+
+    Semicolon-delimited; older files are latin-1, newer ones UTF-8.
+    ``index_col=False`` because the rows carry a trailing ';' that would otherwise
+    make pandas adopt the first column as the index and shift every column left.
     """
     raw = content
     if content[:2] == b"PK":  # zip magic
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             raw = archive.read(archive.namelist()[0])
-    df = pd.read_csv(io.BytesIO(raw), sep=";", encoding="latin-1", index_col=False)
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+    with warnings.catch_warnings():
+        # One era file has a spare trailing ';' on every data row; pandas warns
+        # that it drops that (empty) extra field.
+        warnings.simplefilter("ignore", pd.errors.ParserWarning)
+        return pd.read_csv(
+            io.StringIO(text),
+            sep=";",
+            index_col=False,
+            dtype=str,
+            keep_default_na=False,
+        )
+
+
+def _parse_fdj(content: bytes, n_main: int, source: FdjSource) -> list[dict]:
+    """Parse one FDJ draw file to draw dicts (balls + per-rank winners/payouts).
+
+    Returns [] if the ball columns are absent. Rank columns are optional and vary
+    by era; whatever is present is kept.
+    """
+    df = _read_fdj_table(content)
     main_cols = [f"boule_{i}" for i in range(1, n_main + 1)]
-    need = ["date_de_tirage"] + main_cols + special_cols
+    need = ["date_de_tirage", *main_cols, *source.fdj_special_cols]
     if not all(c in df.columns for c in need):
         return []
+
+    label = f"_{source.rank_label}" if source.rank_label else ""
+    rank_cols: dict[int, tuple[str | None, str | None, str | None]] = {}
+    for rank in range(1, 21):
+        if label:
+            total = f"nombre_de_gagnant_au_rang{rank}{label}_en_europe"
+            french = f"nombre_de_gagnant_au_rang{rank}{label}_en_france"
+        else:
+            total = french = f"nombre_de_gagnant_au_rang{rank}"
+        payout = f"rapport_du_rang{rank}{label}"
+        if payout not in df.columns:
+            break
+        rank_cols[rank] = (
+            total if total in df.columns else None,
+            french if french in df.columns else None,
+            payout,
+        )
+    cycle_col = next((c for c in df.columns if "de_tirage_dans_le_cycle" in c), None)
+    has_codes = "nombre_de_codes_gagnants" in df.columns
+
     rows = []
-    for _, r in df.iterrows():
+    for record in df.to_dict("records"):
         try:
-            date = _dt.datetime.strptime(
-                str(r["date_de_tirage"]).strip(), "%d/%m/%Y"
-            ).date()
-            main = sorted(int(r[c]) for c in main_cols)
-            special = sorted(int(r[c]) for c in special_cols)
+            date = _fdj_date(record["date_de_tirage"])
+            main = sorted(int(record[c]) for c in main_cols)
+            special = sorted(int(record[c]) for c in source.fdj_special_cols)
         except (ValueError, TypeError):
             continue
+        ranks = {}
+        for rank, (total_col, french_col, payout_col) in rank_cols.items():
+            total = _num(record[total_col]) if total_col else None
+            french = _num(record[french_col]) if french_col else None
+            # Some files leave the Europe-wide count at 0 while France has
+            # winners: that is a missing value, not zero.
+            if total is not None and french is not None and total < french:
+                total = None
+            ranks[rank] = (total, french, _num(record[payout_col]))
         rows.append(
             {
                 "date": date,
                 "main": main,
                 "special": special,
-                "draw": str(r.get("annee_numero_de_tirage", "")).strip(),
+                "draw": str(record.get("annee_numero_de_tirage", "")).strip(),
+                "cycle": _num(record[cycle_col]) if cycle_col else None,
+                "ranks": ranks,
+                "codes_winners": (
+                    _num(record["nombre_de_codes_gagnants"]) if has_codes else None
+                ),
+                "codes_payout": (
+                    _num(record.get("rapport_codes_gagnants")) if has_codes else None
+                ),
             }
         )
     return rows
 
 
-def _download_fdj(sources: list[str], n_main: int, special_cols: list[str]) -> dict:
-    """Download FDJ sources and merge their draws, de-duped by draw date."""
+def _download_fdj(game: str, session=None) -> dict:
+    """Download a game's FDJ files and merge their draws, de-duped by draw date."""
+    source = FDJ_SOURCES[game]
+    spec = get(game)
+    http = session or requests
     by_date: dict[_dt.date, dict] = {}
-    for url in sources:
-        resp = requests.get(url, headers=_UA, timeout=60)
+    for url in source.urls:
+        resp = http.get(url, headers=_UA, timeout=60)
         resp.raise_for_status()
-        rows = _parse_fdj(resp.content, n_main, special_cols)
+        rows = _parse_fdj(resp.content, spec.main_count, source)
         if not rows:
             raise ValueError(
                 f"FDJ source produced no usable draws; its format may have changed: {url}"
@@ -156,180 +300,156 @@ def _download_fdj(sources: list[str], n_main: int, special_cols: list[str]) -> d
     return by_date
 
 
-def _write_fdj_snapshot(
-    game: str, today: _dt.date, header: list[str], by_date: dict
-) -> str:
-    """Write merged FDJ draws to one combined snapshot in the game's adapter layout."""
-    if not by_date:
-        raise ValueError(
-            f"FDJ {game} fetch produced no draws — the FDJ sources may have changed."
-        )
-    rows = sorted(by_date.values(), key=lambda r: r["date"])
+def _cell(value) -> str:
+    if value is None:
+        return ""
+    return str(int(value)) if float(value).is_integer() else repr(float(value))
+
+
+def _fdj_snapshot_bytes(game: str, by_date: dict) -> bytes:
+    """Merged FDJ draws as one CSV in the game's adapter layout, plus rank columns."""
+    source = FDJ_SOURCES[game]
+    n_ranks = len(get(game).rank_tiers)
+    header = [source.date_col, *source.main_cols, *source.special_cols]
+    header += ["DrawNumber", "cycle"]
+    for rank in range(1, n_ranks + 1):
+        header += [f"r{rank}_winners", f"r{rank}_winners_fr", f"r{rank}_payout"]
+    header += ["codes_winners", "codes_payout"]
+
     buffer = io.StringIO(newline="")
-    writer = _csv.writer(buffer)
+    writer = _csv.writer(buffer, lineterminator="\n")
     writer.writerow(header)
-    for row in rows:
-        writer.writerow(
-            [row["date"].isoformat(), *row["main"], *row["special"], row["draw"]]
-        )
-    content = buffer.getvalue().encode("utf-8")
-    digest = hashlib.sha256(content).hexdigest()[:8]
-    timestamp = _dt.datetime.now().strftime("%H%M%S")
-    os.makedirs(os.path.join(RAW_DIR, game), exist_ok=True)
-    filename = f"{today.isoformat()}__zz-{timestamp}__fdj-{digest}.csv"
-    path = os.path.join(RAW_DIR, game, filename)
+    for row in sorted(by_date.values(), key=lambda r: r["date"]):
+        line = [row["date"].isoformat(), *row["main"], *row["special"]]
+        line += [row["draw"], _cell(row["cycle"])]
+        for rank in range(1, n_ranks + 1):
+            line += [_cell(v) for v in row["ranks"].get(rank, (None, None, None))]
+        line += [_cell(row["codes_winners"]), _cell(row["codes_payout"])]
+        writer.writerow(line)
+    return buffer.getvalue().encode("utf-8")
+
+
+# --- Fetching --------------------------------------------------------------------
+
+
+def _count_draws(game: str, content: bytes) -> int:
+    """How many draws these snapshot bytes yield through the adapter (0 if none)."""
     try:
-        with open(path, "xb") as output:
-            output.write(content)
-    except FileExistsError:
-        # Same content fetched within the same second: return the immutable file.
-        pass
-    return path
+        return len(adapters.parse(game, pd.read_csv(io.BytesIO(content))))
+    except SNAPSHOT_PARSE_ERRORS:
+        return 0
 
 
-def fetch_euromillions(*, today: _dt.date | None = None) -> str:
-    """Download FDJ's multi-era EuroMillions history, merge, write one snapshot.
+def _read_bytes(path: str) -> bytes:
+    with open(path, "rb") as handle:
+        return handle.read()
 
-    Written in the national-lottery column layout so the existing euromillions
-    adapter reads it with no special-casing (the trailing draw_id column is ignored
-    by games whose adapter doesn't use it).
+
+def store_snapshot(
+    game: str,
+    content: bytes,
+    source: str,
+    *,
+    now: _dt.datetime | None = None,
+    validate: bool = True,
+) -> str:
+    """Write ``content`` as a new immutable snapshot and return its path.
+
+    Returns the existing newest snapshot instead when the content is identical to
+    it, so refreshing on a quiet day adds nothing. With ``validate`` the content
+    must parse to draws, and must not have lost draws relative to the newest
+    snapshot on disk — a changed, expired, or truncated source can never leave a
+    worse snapshot in front of a good one.
     """
-    today = today or _dt.date.today()
-    by_date = _download_fdj(EUROMILLIONS_FDJ_SOURCES, 5, ["etoile_1", "etoile_2"])
-    header = [
-        "DrawDate",
-        "Ball 1",
-        "Ball 2",
-        "Ball 3",
-        "Ball 4",
-        "Ball 5",
-        "Lucky Star 1",
-        "Lucky Star 2",
-        "DrawNumber",
-    ]
-    return _write_fdj_snapshot("euromillions", today, header, by_date)
+    now = now or _dt.datetime.now()
+    newest = newest_snapshot(game)
+    previous = _read_bytes(newest) if newest else None
+    if previous == content:
+        return newest
 
+    if validate:
+        n_new = _count_draws(game, content)
+        if n_new == 0:
+            raise ValueError(
+                f"Fetched {game!r} data did not parse to any draws — the source "
+                f"format may have changed. Nothing written."
+            )
+        n_old = _count_draws(game, previous) if previous else 0
+        if n_new < MIN_KEEP_FRACTION * n_old:
+            raise ValueError(
+                f"Fetched {game!r} data has {n_new} draws but the newest snapshot "
+                f"has {n_old} — it looks truncated. Nothing written."
+            )
 
-def fetch_eurodreams(*, today: _dt.date | None = None) -> str:
-    """Download FDJ's EuroDreams history and write one snapshot in Kaggle layout."""
-    today = today or _dt.date.today()
-    by_date = _download_fdj(EURODREAMS_FDJ_SOURCES, 6, ["numero_dream"])
-    # trailing "DrawNumber" matches the writer's draw_id column; the adapter reads
-    # by name and ignores it.
-    header = [
-        "Date",
-        "Number 1",
-        "Number 2",
-        "Number 3",
-        "Number 4",
-        "Number 5",
-        "Number 6",
-        "Dream Number",
-        "DrawNumber",
-    ]
-    return _write_fdj_snapshot("eurodreams", today, header, by_date)
+    digest = hashlib.sha256(content).hexdigest()[:8]
+    folder = raw_dir(game)
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, f"{now:%Y-%m-%dT%H%M%S}__{source}-{digest}.csv")
+    with open(path, "xb") as output:
+        output.write(content)
+    return path
 
 
 def fetch_raw(
-    game: str, *, today: _dt.date | None = None, validate: bool = True
-) -> str:
-    """Download a fresh snapshot to data/raw/<game>/. Returns the new path.
-
-    Network side-effect; not exercised by the offline test suite. With
-    ``validate`` (default), the result must parse to >= 1 draw or it is discarded
-    and an error is raised — so a changed/expired source can never leave a garbage
-    snapshot behind (as the old EuroMillions CSV endpoint did when it switched to
-    an XML latest-draw-only feed).
-    """
-    today = today or _dt.date.today()
-    newly_written = True
-    if game == "euromillions":
-        path = fetch_euromillions(today=today)
-    elif game == "eurodreams":
-        path = fetch_eurodreams(today=today)
-    elif game in FETCH_URLS:
-        resp = requests.get(FETCH_URLS[game], headers=_UA, timeout=60)
-        resp.raise_for_status()
-        digest = hashlib.sha256(resp.content).hexdigest()[:8]
-        os.makedirs(os.path.join(RAW_DIR, game), exist_ok=True)
-        path = os.path.join(RAW_DIR, game, f"{today.isoformat()}__{digest}.csv")
-        newly_written = not os.path.exists(path)
-        if newly_written:
-            with open(path, "wb") as f:
-                f.write(resp.content)
-    else:
-        raise ValueError(f"No fetch source configured for {game!r}.")
-
-    if validate and _count_parsable_draws(game, path) == 0:
-        if newly_written and os.path.exists(path):
-            os.remove(path)
-        raise ValueError(
-            f"Fetched {game!r} data did not parse to any draws — the source format "
-            f"may have changed. Snapshot discarded."
-        )
-    return path
-
-
-def load_canonical(
     game: str,
     *,
-    modern_only: bool = True,
-    verbose: bool = False,
-) -> pd.DataFrame:
+    now: _dt.datetime | None = None,
+    validate: bool = True,
+    session=None,
+) -> str:
+    """Download fresh official history and store it as a snapshot. Returns its path
+    (the existing newest snapshot when nothing changed).
+
+    Network side-effect. ``session`` is anything with a ``requests``-style ``get``.
+    """
+    if game in FDJ_SOURCES:
+        content = _fdj_snapshot_bytes(game, _download_fdj(game, session))
+        source = "fdj"
+    elif game in FETCH_URLS:
+        resp = (session or requests).get(FETCH_URLS[game], headers=_UA, timeout=60)
+        resp.raise_for_status()
+        content, source = resp.content, "ny"
+    else:
+        raise ValueError(f"No fetch source configured for {game!r}.")
+    return store_snapshot(game, content, source, now=now, validate=validate)
+
+
+# --- Loading ---------------------------------------------------------------------
+
+
+def load_canonical(game: str, *, modern_only: bool = True) -> pd.DataFrame:
     """Load the newest snapshot as a validated, tidy, chronologically-sorted frame.
 
-    ``modern_only`` filters to draws on/after the 2018 floor / current matrix and
-    drops any row not valid under the current matrix (a safety net for mixed-era
-    files). Snapshots are tried newest-first; a snapshot that fails to parse or
-    yields zero draws is skipped, so one bad fetch never breaks the pipeline.
+    ``modern_only`` keeps draws on/after the game's current-matrix date and drops
+    any row not valid under the current matrix (a safety net for mixed-era files).
+    Snapshots are tried newest-first; a snapshot that fails to parse or yields zero
+    draws is skipped, so one bad file never breaks the pipeline.
     """
     spec = get(game)
     snapshots = all_snapshots(game)
     if not snapshots:
         raise FileNotFoundError(
-            f"No raw snapshot for {game!r} in {os.path.join(RAW_DIR, game)}. "
-            f"Run fetch_raw({game!r}) or add a CSV."
+            f"No raw snapshot for {game!r} in {raw_dir(game)}. "
+            f"Run `lotterylab fetch {game}` or add a CSV."
         )
+    cutoff = spec.matrix_since if modern_only else None
 
-    # Effective cutoff = the later of the 2018 floor and either pool's last change.
-    cutoff = None
-    if modern_only:
-        cutoff = MIN_DATE
-        if spec.matrix_since and spec.matrix_since > cutoff:
-            cutoff = spec.matrix_since
-
-    for idx, path in enumerate(snapshots):
+    for path in snapshots:
         try:
             draws = adapters.parse(game, pd.read_csv(path))
         except SNAPSHOT_PARSE_ERRORS:
-            draws = []
-
+            continue
         kept: list[Draw] = []
-        dropped_era = dropped_invalid = 0
         for d in draws:
             if cutoff and d.date < cutoff:
-                dropped_era += 1
                 continue
             try:
                 validate_ticket(d.main, d.special, spec)
             except InvalidTicket:
-                dropped_invalid += 1
                 continue
             kept.append(d)
-
-        if not kept:
-            continue  # unparsable / empty snapshot — fall back to an older one
-
-        if verbose:
-            note = (
-                "" if idx == 0 else f" [fell back past {idx} newer broken snapshot(s)]"
-            )
-            print(
-                f"[{game}] loaded {len(kept)} draws from {os.path.basename(path)}"
-                f"{note} (dropped {dropped_era} pre-{cutoff} + "
-                f"{dropped_invalid} invalid-under-current-matrix)"
-            )
-        return draws_to_frame(kept, spec)
+        if kept:
+            return draws_to_frame(kept, spec)
 
     raise ValueError(
         f"No usable snapshot for {game!r}: all {len(snapshots)} file(s) failed to "
@@ -337,9 +457,54 @@ def load_canonical(
     )
 
 
-def write_cache(game: str, df: pd.DataFrame) -> str:
-    """Write a derived canonical cache CSV and return its path."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    path = os.path.join(CACHE_DIR, f"{game}.csv")
-    df.to_csv(path, index=False)
-    return path
+def payout_columns(spec: GameSpec) -> list[str]:
+    """Per-rank columns a payout frame carries for ``spec``."""
+    cols = []
+    for rank in range(1, len(spec.rank_tiers) + 1):
+        cols += [f"r{rank}_winners", f"r{rank}_winners_fr", f"r{rank}_payout"]
+    return cols
+
+
+def load_payouts(game: str, *, current_rules_only: bool = True) -> pd.DataFrame:
+    """Per-draw winner counts and prize amounts by rank, from the newest snapshot
+    that carries them.
+
+    Columns: ``date``, ``cycle`` (draw number within the rollover cycle),
+    ``m1..mk``/``s1..sj`` (the balls), ``r<rank>_winners`` (all participating
+    countries), ``r<rank>_winners_fr`` (France), ``r<rank>_payout`` (per winner),
+    ``codes_winners``/``codes_payout`` (raffle codes). ``current_rules_only`` keeps
+    draws since the game's present prize structure (``spec.payout_since``);
+    otherwise every draw whose ranks mean what they mean today
+    (``spec.ranks_since``) — winner counts stay comparable across prize changes.
+
+    Raises ``FileNotFoundError`` when the game publishes no such data (the US
+    sources) or no snapshot has it yet (fetch a fresh one).
+    """
+    spec = get(game)
+    source = FDJ_SOURCES.get(game)
+    if source is None or not spec.rank_tiers:
+        raise FileNotFoundError(f"{spec.name} has no per-rank payout data source.")
+    wanted = payout_columns(spec)
+    for path in all_snapshots(game):
+        try:
+            raw = pd.read_csv(path)
+        except SNAPSHOT_PARSE_ERRORS:
+            continue
+        if "r1_payout" not in raw.columns:
+            continue
+        frame = pd.DataFrame({"date": pd.to_datetime(raw[source.date_col]).dt.date})
+        frame["cycle"] = raw.get("cycle")
+        for name, col in zip(main_columns(spec), source.main_cols):
+            frame[name] = raw[col].astype(int)
+        for name, col in zip(special_columns(spec), source.special_cols):
+            frame[name] = raw[col].astype(int)
+        for col in [*wanted, "codes_winners", "codes_payout"]:
+            frame[col] = pd.to_numeric(raw.get(col), errors="coerce")
+        since = spec.payout_since if current_rules_only else spec.ranks_since
+        if since:
+            frame = frame[frame["date"] >= since]
+        return frame.sort_values("date").reset_index(drop=True)
+    raise FileNotFoundError(
+        f"No {spec.name} snapshot with payout columns yet. "
+        f"Run `lotterylab fetch {game}`."
+    )

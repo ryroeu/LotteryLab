@@ -81,9 +81,9 @@ with c3:
     with st.container(border=True):
         st.markdown("##### 💰 Unpopular numbers raise *payout*, not probability")
         st.markdown(
-            "Jackpots are split among matching tickets; avoiding birthdays (≤31) "
-            "means sharing with fewer people **if** you win. Real, but only for "
-            "pari-mutuel tiers. *(→ Expected Value)*"
+            "Most prizes in the French games are pools split among that draw's "
+            "winners; numbers few people play collect a bigger slice **if** they "
+            "win. Measured from FDJ's own winner counts. *(→ Expected Value)*"
         )
 
 # --- Data on disk ----------------------------------------------------------------

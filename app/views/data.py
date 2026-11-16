@@ -13,8 +13,8 @@ from lotterylab import games, store
 st.title("🗃️ Data")
 st.caption(
     "Source CSVs are immutable, timestamped snapshots under `data/raw/<game>/` — "
-    "never overwritten. The loader tries snapshots newest-first and applies the "
-    "2018 floor + each game's matrix-change date, so odds and backtests always "
+    "never overwritten. The loader tries snapshots newest-first and keeps draws "
+    "since each game's current matrix took effect, so odds and backtests always "
     "run against one consistent set of rules."
 )
 
@@ -43,7 +43,8 @@ for key in shared.GAME_KEYS:
                 key=f"fetch_{key}",
                 width="stretch",
                 help="Downloads from the official source and writes a NEW snapshot "
-                "(rejects a download that doesn't parse to any draws).",
+                "(nothing is written if the data is unchanged, unparsable or "
+                "truncated).",
             )
 
         if fetch:
@@ -57,9 +58,8 @@ for key in shared.GAME_KEYS:
                 ) as error:
                     st.error(f"Fetch failed: {error}")
                 else:
-                    st.success(f"Wrote `{os.path.basename(path)}`.")
-                    shared.load_history.clear()
-                    shared.history_status.clear()
+                    st.success(f"Newest snapshot: `{os.path.basename(path)}`.")
+                    shared.clear_data_caches()
                     st.rerun()
 
         if snapshots:
@@ -69,9 +69,10 @@ for key in shared.GAME_KEYS:
                     st.markdown(f"- `{os.path.basename(p)}` ({size_kb:,.0f} KB)")
 
 st.info(
-    "Powerball and Mega Millions come from NY Open Data; EuroMillions and EuroDreams "
-    "from FDJ (the French operator), whose era-split files are merged and de-duped "
-    "into one combined snapshot per fetch.",
+    "Powerball and Mega Millions come from NY Open Data; EuroMillions, EuroDreams "
+    "and Loto from FDJ (the French operator), whose era-split files are merged and "
+    "de-duped into one combined snapshot per fetch — including how many tickets won "
+    "each prize rank and what they were paid, which the Expected Value page uses.",
     icon="🌐",
 )
 

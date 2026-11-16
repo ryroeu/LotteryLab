@@ -9,4 +9,4 @@ a low-tier hit at a known cost, and an expected-value model for jackpot sharing.
 from .games import GAMES, GameSpec, get
 
 __all__ = ["GAMES", "GameSpec", "get"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

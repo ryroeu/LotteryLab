@@ -67,7 +67,16 @@ test = analytics.uniformity_test(hist, spec)
 
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Balls observed", f"{test['n_balls_observed']:,}", border=True)
-m2.metric("Chi-square", f"{test['chi2']:.1f}", border=True)
+m2.metric(
+    "Chi-square",
+    f"{test['chi2']:.1f}",
+    help=(
+        "Corrected for drawing without replacement: the textbook statistic "
+        f"({test['chi2_uncorrected']:.1f} here) runs low because a number can "
+        "appear only once per draw, which would make the test too lenient."
+    ),
+    border=True,
+)
 m3.metric("Degrees of freedom", test["dof"], border=True)
 m4.metric("p-value", f"{test['p_value']:.3f}", border=True)
 

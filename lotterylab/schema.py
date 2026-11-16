@@ -51,20 +51,20 @@ def draws_to_frame(draws: list[Draw], spec: GameSpec) -> pd.DataFrame:
 
 def frame_to_draws(df: pd.DataFrame, spec: GameSpec) -> list[Draw]:
     """Convert a canonical DataFrame back into ``Draw`` objects."""
-    main_cols = [f"m{j + 1}" for j in range(spec.main_count)]
-    spec_cols = [f"s{j + 1}" for j in range(spec.special_count)]
-    out = []
-    for _, row in df.iterrows():
-        out.append(
-            Draw(
-                game=spec.key,
-                date=row["date"],
-                draw_id=row.get("draw_id"),
-                main=tuple(int(row[c]) for c in main_cols),
-                special=tuple(int(row[c]) for c in spec_cols),
-            )
+    mains = df[main_columns(spec)].to_numpy(dtype=int)
+    specials = df[special_columns(spec)].to_numpy(dtype=int)
+    dates = df["date"].tolist()
+    ids = df["draw_id"].tolist() if "draw_id" in df.columns else [None] * len(df)
+    return [
+        Draw(
+            game=spec.key,
+            date=dates[i],
+            draw_id=ids[i],
+            main=tuple(mains[i].tolist()),
+            special=tuple(specials[i].tolist()),
         )
-    return out
+        for i in range(len(df))
+    ]
 
 
 def main_columns(spec: GameSpec) -> list[str]:
